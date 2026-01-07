@@ -1,5 +1,6 @@
 """Integration tests for ChatScreen."""
 
+import asyncio
 import tempfile
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -52,7 +53,8 @@ async def test_chat_screen_initialization():
         assert screen.chat_service == chat_service
         assert screen.project_root == Path(tmpdir)
         assert len(screen.message_history) == 0
-        assert screen.is_streaming is False
+        # Check that no streaming tasks are active
+        assert len(screen._active_streaming_tasks) == 0
 
 
 @pytest.mark.asyncio
@@ -74,8 +76,8 @@ async def test_chat_screen_compose():
             messages_container = screen.query_one("#messages-container", expect_type=None)
             assert messages_container is not None
             
-            streaming_message = screen.query_one("#streaming-message", expect_type=None)
-            assert streaming_message is not None
+            # streaming-message widget is created dynamically during streaming
+            # so it won't exist initially
 
 
 @pytest.mark.asyncio
@@ -101,10 +103,11 @@ async def test_chat_screen_input_submission():
             
             # Wait for streaming to complete (with timeout)
             import asyncio
-            for _ in range(10):  # Try up to 10 times
+            for _ in range(20):  # Try up to 20 times
                 await asyncio.sleep(0.1)
                 await pilot.pause()
-                if not screen.is_streaming:
+                # Check if streaming tasks are done
+                if len(screen._active_streaming_tasks) == 0:
                     break
             
             # Check that message was added to history
@@ -123,8 +126,8 @@ async def test_chat_screen_input_submission():
 
 
 @pytest.mark.asyncio
-async def test_chat_screen_streaming_disables_input():
-    """Test that input is disabled during streaming."""
+async def test_chat_screen_allows_multiple_inputs_during_streaming():
+    """Test that input is allowed during streaming (multiple questions)."""
     from prior.tui.app import PriorApp
     
     agent = MockAgent()
@@ -136,18 +139,32 @@ async def test_chat_screen_streaming_disables_input():
             screen = app.screen
             input_box = screen.query_one("#input-box")
             
-            # Start streaming
-            screen.is_streaming = True
-            
-            # Try to submit - should be ignored
+            # Submit first message
             from textual.widgets import Input
-            event = Input.Submitted(input_box, "Test")
             initial_history_len = len(screen.message_history)
+            event1 = Input.Submitted(input_box, "First question")
+            await screen.on_input_submitted(event1)
             
-            await screen.on_input_submitted(event)
+            # Check that first message was added
+            assert len(screen.message_history) == initial_history_len + 1
+            assert screen.message_history[-1]["role"] == "user"
+            assert screen.message_history[-1]["content"] == "First question"
             
-            # History should not change
-            assert len(screen.message_history) == initial_history_len
+            # Wait a bit and check if streaming started (may complete quickly with mock)
+            await asyncio.sleep(0.1)
+            await pilot.pause()
+            
+            # Submit second message (should be allowed regardless of streaming state)
+            input_box.value = "Second question"
+            event2 = Input.Submitted(input_box, "Second question")
+            await screen.on_input_submitted(event2)
+            
+            # History should have increased (both messages added)
+            assert len(screen.message_history) >= initial_history_len + 2
+            # Find the second user message
+            user_messages = [msg for msg in screen.message_history if msg["role"] == "user"]
+            assert len(user_messages) >= 2
+            assert user_messages[-1]["content"] == "Second question"
 
 
 @pytest.mark.asyncio

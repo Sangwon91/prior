@@ -48,7 +48,8 @@ async def test_app_mounts_chat_screen():
         # Check that ChatScreen is mounted
         from prior.tui.screens.chat import ChatScreen
         assert isinstance(app.screen, ChatScreen)
-        assert app.screen.agent == agent
+        # ChatScreen has chat_service, not agent directly
+        assert app.screen.chat_service.agent == agent
 
 
 @pytest.mark.asyncio
