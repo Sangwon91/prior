@@ -4,10 +4,23 @@ version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 authors = [
-    { name = "Sangwon", email = "lsw91@lgchem.com" }
+    { name = "Sangwon", email = "lsw91.main@gmail.com" }
 ]
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "textual>=0.80.0",
+    "litellm>=1.50.0",
+    "python-dotenv>=1.0.0",
+]
+
+[project.scripts]
+prior = "prior.cli:main"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+]
 
 [build-system]
 requires = ["uv_build>=0.9.8,<0.10.0"]
