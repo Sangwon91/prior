@@ -4,11 +4,12 @@ import asyncio
 from pathlib import Path
 
 from textual.app import ComposeResult
-from textual.containers import Horizontal, Vertical, VerticalScroll
+from textual.containers import Horizontal, Vertical
 from textual.screen import Screen
 from textual.widgets import Footer, Header, Input, Markdown, Static
 
 from ...core.chat_service import ChatService
+from ..widgets import ClipboardInput, MousePassthroughScroll
 
 
 class ChatScreen(Screen):
@@ -67,8 +68,6 @@ class ChatScreen(Screen):
 
     BINDINGS = [
         ("q", "quit", "Quit"),
-        ("ctrl+c", "copy_selection", "Copy"),
-        ("ctrl+v", "paste", "Paste"),
     ]
 
     def __init__(self, chat_service: ChatService, project_root: Path | None = None):
@@ -91,10 +90,10 @@ class ChatScreen(Screen):
         with Vertical(id="chat-container"):
             yield Static(f"Project: {self.project_root.name}", id="status-bar")
             yield Static("", id="current-question")
-            with VerticalScroll(id="messages-container"):
+            with MousePassthroughScroll(id="messages-container"):
                 pass  # Messages will be added dynamically
             with Horizontal(id="input-container"):
-                yield Input(
+                yield ClipboardInput(
                     placeholder="Ask about the project or request coding help...",
                     id="input-box",
                 )
@@ -103,7 +102,7 @@ class ChatScreen(Screen):
     def on_mount(self) -> None:
         """Called when screen is mounted."""
         # Focus input box
-        self.query_one("#input-box", Input).focus()
+        self.query_one("#input-box", ClipboardInput).focus()
 
     async def on_input_submitted(self, event: Input.Submitted) -> None:
         """Handle input submission."""
@@ -116,7 +115,7 @@ class ChatScreen(Screen):
         current_question_widget.update(f"Current Question: {user_input}")
 
         # Clear input (but don't disable - allow multiple questions)
-        input_box = self.query_one("#input-box", Input)
+        input_box = self.query_one("#input-box", ClipboardInput)
         input_box.value = ""
 
         # Add to history
@@ -133,7 +132,7 @@ class ChatScreen(Screen):
 
     def _add_user_message(self, content: str) -> None:
         """Add user message to display."""
-        messages_container = self.query_one("#messages-container", VerticalScroll)
+        messages_container = self.query_one("#messages-container", MousePassthroughScroll)
         user_markdown = Markdown(f"**You:** {content}", classes="user-message")
         messages_container.mount(user_markdown)
         # Scroll to bottom to show new message
@@ -145,7 +144,7 @@ class ChatScreen(Screen):
         try:
             # Get streaming response
             response_chunks: list[str] = []
-            messages_container = self.query_one("#messages-container", VerticalScroll)
+            messages_container = self.query_one("#messages-container", MousePassthroughScroll)
             
             # Create streaming widget
             streaming_widget = Markdown("", classes="assistant-message")
@@ -176,7 +175,7 @@ class ChatScreen(Screen):
             messages_container.scroll_end(animate=False)
 
         except Exception as e:
-            messages_container = self.query_one("#messages-container", VerticalScroll)
+            messages_container = self.query_one("#messages-container", MousePassthroughScroll)
             error_markdown = Markdown(f"**Error:** {str(e)}", classes="assistant-message")
             messages_container.mount(error_markdown)
             messages_container.scroll_end(animate=False)
@@ -186,71 +185,6 @@ class ChatScreen(Screen):
         # Yield control to allow UI updates
         await asyncio.sleep(0)
 
-    def action_copy_selection(self) -> None:
-        """Copy selected text to clipboard."""
-        try:
-            import pyperclip
-            
-            # Check Input widget first
-            input_box = self.query_one("#input-box", Input)
-            if input_box.has_focus and hasattr(input_box, "selection") and input_box.selection:
-                selected_text = input_box.value[input_box.selection.start:input_box.selection.end]
-                if selected_text:
-                    pyperclip.copy(selected_text)
-                    return
-            
-            # For Markdown widgets - copy the full content
-            focused = self.focused
-            if focused and isinstance(focused, Markdown):
-                if hasattr(focused, "markdown"):
-                    content = focused.markdown
-                    if content:
-                        pyperclip.copy(content)
-                        return
-            
-            # For current question widget
-            current_question = self.query_one("#current-question", Static)
-            if current_question.has_focus or focused == current_question:
-                if hasattr(current_question, "renderable"):
-                    # Get text content from Static widget
-                    try:
-                        content = str(current_question.renderable)
-                        if content and content != "":
-                            pyperclip.copy(content)
-                            return
-                    except Exception:
-                        pass
-            
-        except ImportError:
-            pass
-        except Exception:
-            pass
-
-    def action_paste(self) -> None:
-        """Paste from clipboard to input box."""
-        try:
-            import pyperclip
-            clipboard_text = pyperclip.paste()
-            if clipboard_text:
-                input_box = self.query_one("#input-box", Input)
-                # Focus input box if not already focused
-                if not input_box.has_focus:
-                    input_box.focus()
-                
-                current_value = input_box.value
-                cursor_position = input_box.cursor_position
-                new_value = (
-                    current_value[:cursor_position]
-                    + clipboard_text
-                    + current_value[cursor_position:]
-                )
-                input_box.value = new_value
-                input_box.cursor_position = cursor_position + len(clipboard_text)
-        except ImportError:
-            # pyperclip not available
-            pass
-        except Exception:
-            pass
 
     def action_quit(self) -> None:
         """Quit the application."""
