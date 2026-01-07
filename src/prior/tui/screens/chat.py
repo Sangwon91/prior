@@ -1,17 +1,14 @@
 """Chat screen for coding agent."""
 
 import asyncio
-from collections.abc import AsyncIterator
 from pathlib import Path
 
-from rich.markdown import Markdown
 from textual.app import ComposeResult
-from textual.containers import Container, Horizontal, Vertical, VerticalScroll
+from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import Screen
-from textual.widgets import Footer, Header, Input, RichLog, Static
+from textual.widgets import Footer, Header, Input, Markdown, Static
 
-from ...core.agent import Agent
-from ...core.filetree import get_project_tree
+from ...core.chat_service import ChatService
 
 
 class ChatScreen(Screen):
@@ -27,7 +24,14 @@ class ChatScreen(Screen):
         layout: vertical;
     }
 
-    #messages-area {
+    #current-question {
+        height: auto;
+        border-bottom: wide $primary;
+        padding: 1;
+        background: $primary 10%;
+    }
+
+    #messages-container {
         height: 1fr;
         border: wide $primary;
         padding: 1;
@@ -59,42 +63,36 @@ class ChatScreen(Screen):
         height: 1;
         padding: 0 1;
     }
-
-    #streaming-message {
-        padding: 1;
-        min-height: 1;
-    }
     """
 
     BINDINGS = [
         ("q", "quit", "Quit"),
-        ("ctrl+c", "quit", "Quit"),
+        ("ctrl+c", "copy_selection", "Copy"),
+        ("ctrl+v", "paste", "Paste"),
     ]
 
-    def __init__(self, agent: Agent, project_root: Path | None = None):
+    def __init__(self, chat_service: ChatService, project_root: Path | None = None):
         """
         Initialize chat screen.
 
         Args:
-            agent: Agent instance
+            chat_service: ChatService instance for handling chat operations
             project_root: Project root directory (default: current directory)
         """
         super().__init__()
-        self.agent = agent
-        self.project_root = project_root or Path.cwd()
-        self.project_tree = get_project_tree(self.project_root)
+        self.chat_service = chat_service
+        self.project_root = project_root or chat_service.project_root
         self.message_history: list[dict[str, str]] = []
-        self.is_streaming = False
-        self._current_response: str = ""  # Track current streaming response
+        self._active_streaming_tasks: set[asyncio.Task] = set()  # Track active streaming tasks
 
     def compose(self) -> ComposeResult:
         """Create child widgets."""
         yield Header()
         with Vertical(id="chat-container"):
             yield Static(f"Project: {self.project_root.name}", id="status-bar")
-            with VerticalScroll(id="messages-area"):
-                yield RichLog(id="messages-log", markup=True, wrap=True)
-                yield Static("", id="streaming-message", classes="assistant-message")
+            yield Static("", id="current-question")
+            with VerticalScroll(id="messages-container"):
+                pass  # Messages will be added dynamically
             with Horizontal(id="input-container"):
                 yield Input(
                     placeholder="Ask about the project or request coding help...",
@@ -109,79 +107,150 @@ class ChatScreen(Screen):
 
     async def on_input_submitted(self, event: Input.Submitted) -> None:
         """Handle input submission."""
-        if self.is_streaming:
-            return
-
         user_input = event.value.strip()
         if not user_input:
             return
 
-        # Clear input
+        # Update current question display
+        current_question_widget = self.query_one("#current-question", Static)
+        current_question_widget.update(f"Current Question: {user_input}")
+
+        # Clear input (but don't disable - allow multiple questions)
         input_box = self.query_one("#input-box", Input)
         input_box.value = ""
-        input_box.disabled = True
-
-        # Display user message
-        self._add_user_message(user_input)
 
         # Add to history
         self.message_history.append({"role": "user", "content": user_input})
 
+        # Display user message
+        self._add_user_message(user_input)
+
         # Start streaming response as background task
-        # This allows the UI to remain responsive during streaming
-        self.is_streaming = True
-        asyncio.create_task(self._stream_response())
+        # This allows multiple questions to be asked simultaneously
+        task = asyncio.create_task(self._stream_response())
+        self._active_streaming_tasks.add(task)
+        task.add_done_callback(self._active_streaming_tasks.discard)
 
     def _add_user_message(self, content: str) -> None:
         """Add user message to display."""
-        log = self.query_one("#messages-log", RichLog)
-        log.write(f"[bold blue]You:[/bold blue] {content}")
+        messages_container = self.query_one("#messages-container", VerticalScroll)
+        user_markdown = Markdown(f"**You:** {content}", classes="user-message")
+        messages_container.mount(user_markdown)
+        # Scroll to bottom to show new message
+        messages_container.scroll_end(animate=False)
 
     async def _stream_response(self) -> None:
-        """Stream response from agent."""
+        """Stream response from chat service."""
+        current_response = ""
         try:
             # Get streaming response
             response_chunks: list[str] = []
-            log = self.query_one("#messages-log", RichLog)
-            streaming_widget = self.query_one("#streaming-message", Static)
-            streaming_widget.update("[bold green]Assistant:[/bold green] ")
-            self._current_response = ""
+            messages_container = self.query_one("#messages-container", VerticalScroll)
+            
+            # Create streaming widget
+            streaming_widget = Markdown("", classes="assistant-message")
+            messages_container.mount(streaming_widget)
+            messages_container.scroll_end(animate=False)
 
-            async for chunk in self.agent.chat_stream(
-                self.message_history, project_context=self.project_tree
-            ):
+            async for chunk in self.chat_service.stream_response(self.message_history):
                 response_chunks.append(chunk)
-                self._current_response += chunk
+                current_response += chunk
                 
-                # Update streaming widget with current response
-                streaming_widget.update(f"[bold green]Assistant:[/bold green] {self._current_response}")
+                # Update streaming markdown widget with current response
+                streaming_widget.update(current_response)
+                # Scroll to bottom to follow streaming
+                messages_container.scroll_end(animate=False)
                 # Refresh to show updates
                 await self._refresh_messages()
 
-            # Add complete response to history and log
+            # Add complete response to history
             full_response = "".join(response_chunks)
             self.message_history.append({"role": "assistant", "content": full_response})
             
-            # Move streaming message to log and clear streaming widget
-            log.write(f"[bold green]Assistant:[/bold green] {full_response}")
-            streaming_widget.update("")
+            # Replace streaming widget with completed message
+            completed_markdown = Markdown(full_response, classes="assistant-message")
+            streaming_widget.remove()
+            messages_container.mount(completed_markdown)
+            
+            # Scroll to bottom
+            messages_container.scroll_end(animate=False)
 
         except Exception as e:
-            log = self.query_one("#messages-log", RichLog)
-            log.write(f"[red]Error: {str(e)}[/red]")
-            streaming_widget = self.query_one("#streaming-message", Static)
-            streaming_widget.update("")
-        finally:
-            self.is_streaming = False
-            self._current_response = ""
-            input_box = self.query_one("#input-box", Input)
-            input_box.disabled = False
-            input_box.focus()
+            messages_container = self.query_one("#messages-container", VerticalScroll)
+            error_markdown = Markdown(f"**Error:** {str(e)}", classes="assistant-message")
+            messages_container.mount(error_markdown)
+            messages_container.scroll_end(animate=False)
 
     async def _refresh_messages(self) -> None:
         """Refresh messages display."""
         # Yield control to allow UI updates
         await asyncio.sleep(0)
+
+    def action_copy_selection(self) -> None:
+        """Copy selected text to clipboard."""
+        try:
+            import pyperclip
+            
+            # Check Input widget first
+            input_box = self.query_one("#input-box", Input)
+            if input_box.has_focus and hasattr(input_box, "selection") and input_box.selection:
+                selected_text = input_box.value[input_box.selection.start:input_box.selection.end]
+                if selected_text:
+                    pyperclip.copy(selected_text)
+                    return
+            
+            # For Markdown widgets - copy the full content
+            focused = self.focused
+            if focused and isinstance(focused, Markdown):
+                if hasattr(focused, "markdown"):
+                    content = focused.markdown
+                    if content:
+                        pyperclip.copy(content)
+                        return
+            
+            # For current question widget
+            current_question = self.query_one("#current-question", Static)
+            if current_question.has_focus or focused == current_question:
+                if hasattr(current_question, "renderable"):
+                    # Get text content from Static widget
+                    try:
+                        content = str(current_question.renderable)
+                        if content and content != "":
+                            pyperclip.copy(content)
+                            return
+                    except Exception:
+                        pass
+            
+        except ImportError:
+            pass
+        except Exception:
+            pass
+
+    def action_paste(self) -> None:
+        """Paste from clipboard to input box."""
+        try:
+            import pyperclip
+            clipboard_text = pyperclip.paste()
+            if clipboard_text:
+                input_box = self.query_one("#input-box", Input)
+                # Focus input box if not already focused
+                if not input_box.has_focus:
+                    input_box.focus()
+                
+                current_value = input_box.value
+                cursor_position = input_box.cursor_position
+                new_value = (
+                    current_value[:cursor_position]
+                    + clipboard_text
+                    + current_value[cursor_position:]
+                )
+                input_box.value = new_value
+                input_box.cursor_position = cursor_position + len(clipboard_text)
+        except ImportError:
+            # pyperclip not available
+            pass
+        except Exception:
+            pass
 
     def action_quit(self) -> None:
         """Quit the application."""

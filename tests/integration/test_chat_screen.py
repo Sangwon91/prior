@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from prior.core.agent import Agent
+from prior.core.chat_service import ChatService
 from prior.tui.screens.chat import ChatScreen
 
 
@@ -25,15 +26,30 @@ class MockAgent(Agent):
             yield chunk
 
 
+class MockChatService(ChatService):
+    """Mock chat service for testing."""
+    
+    def __init__(self, project_root: Path | None = None):
+        agent = MockAgent()
+        super().__init__(agent, project_root)
+        self.stream_calls = []
+    
+    async def stream_response(self, messages):
+        """Mock streaming response."""
+        self.stream_calls.append(messages)
+        # Yield some test chunks
+        for chunk in ["Hello", " ", "World"]:
+            yield chunk
+
+
 @pytest.mark.asyncio
 async def test_chat_screen_initialization():
     """Test ChatScreen can be initialized."""
-    agent = MockAgent()
-    
     with tempfile.TemporaryDirectory() as tmpdir:
-        screen = ChatScreen(agent, project_root=Path(tmpdir))
+        chat_service = MockChatService(project_root=Path(tmpdir))
+        screen = ChatScreen(chat_service, project_root=Path(tmpdir))
         
-        assert screen.agent == agent
+        assert screen.chat_service == chat_service
         assert screen.project_root == Path(tmpdir)
         assert len(screen.message_history) == 0
         assert screen.is_streaming is False
@@ -55,8 +71,11 @@ async def test_chat_screen_compose():
             input_box = screen.query_one("#input-box", expect_type=None)
             assert input_box is not None
             
-            messages_log = screen.query_one("#messages-log", expect_type=None)
-            assert messages_log is not None
+            messages_container = screen.query_one("#messages-container", expect_type=None)
+            assert messages_container is not None
+            
+            streaming_message = screen.query_one("#streaming-message", expect_type=None)
+            assert streaming_message is not None
 
 
 @pytest.mark.asyncio

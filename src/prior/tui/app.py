@@ -5,6 +5,7 @@ from pathlib import Path
 from textual.app import App
 
 from ..core.agent import Agent
+from ..core.chat_service import ChatService
 from .screens.chat import ChatScreen
 
 
@@ -38,5 +39,6 @@ class PriorApp(App):
 
     def on_mount(self) -> None:
         """Called when app is mounted."""
-        self.push_screen(ChatScreen(self.agent, self.project_root))
+        chat_service = ChatService(self.agent, self.project_root)
+        self.push_screen(ChatScreen(chat_service, self.project_root))
 
