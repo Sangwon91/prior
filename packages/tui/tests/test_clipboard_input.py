@@ -5,7 +5,7 @@ from textual.app import App, ComposeResult
 from textual.containers import Container
 from textual.events import Paste
 
-from prior.tui.widgets import ClipboardInput
+from tui.widgets import ClipboardInput
 
 
 class ClipboardTestApp(App):

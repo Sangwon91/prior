@@ -4,14 +4,14 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Any
 
-from .agent import Agent
 from .filetree import get_project_tree
+from .protocols import AgentProtocol
 
 
 class ChatService:
     """Service layer for chat operations, decoupling UI from Agent and filetree."""
 
-    def __init__(self, agent: Agent, project_root: Path | None = None):
+    def __init__(self, agent: AgentProtocol, project_root: Path | None = None):
         """
         Initialize chat service.
 

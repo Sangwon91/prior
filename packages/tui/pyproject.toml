@@ -1,0 +1,22 @@
+[project]
+name = "tui"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Sangwon", email = "lsw91@lgchem.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "textual>=7.0.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.9.8,<0.10.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+    "pytest-asyncio>=1.3.0",
+]

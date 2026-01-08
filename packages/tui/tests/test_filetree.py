@@ -3,7 +3,7 @@
 import tempfile
 from pathlib import Path
 
-from prior.core.filetree import get_project_tree
+from tui.filetree import get_project_tree
 
 
 def test_get_project_tree():

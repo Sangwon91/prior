@@ -64,4 +64,48 @@ After wrestling with the limitations of existing tools—watching them produce u
 
 ---
 
+## Development
+
+### Running Tests
+
+This project uses a uv workspace with multiple packages. You can run tests in several ways:
+
+**Run all tests (recommended):**
+```bash
+# Using Makefile (easiest)
+make test
+# or
+make test-all
+
+# Or manually with pytest
+uv run pytest tests -v
+PYTHONPATH=packages/agent/src uv run pytest packages/agent/tests -v
+PYTHONPATH=packages/tui/src uv run pytest packages/tui/tests -v
+```
+
+**Run tests for specific packages:**
+```bash
+# Agent package only
+make test-agent
+# or
+PYTHONPATH=packages/agent/src uv run pytest packages/agent/tests -v
+
+# TUI package only
+make test-tui
+# or
+PYTHONPATH=packages/tui/src uv run pytest packages/tui/tests -v
+
+# Prior main package only
+make test-prior
+# or
+uv run pytest tests -v
+```
+
+**Run tests with coverage:**
+```bash
+uv run pytest --cov=packages/agent/src --cov=packages/tui/src --cov=src/prior tests packages/agent/tests packages/tui/tests
+```
+
+---
+
 *Prior is not about restricting creativity. It's about channeling it through proven engineering practices.*

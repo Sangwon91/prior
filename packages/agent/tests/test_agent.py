@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from prior.core.agent import Agent
+from agent import Agent
 
 
 def test_agent_initialization():
@@ -42,7 +42,7 @@ async def test_agent_chat_stream():
             yield mock_chunk2
         return gen()
     
-    with patch("prior.core.agent.acompletion", side_effect=mock_acompletion):
+    with patch("agent.agent.acompletion", side_effect=mock_acompletion):
         messages = [{"role": "user", "content": "Test"}]
         chunks = []
         async for chunk in agent.chat_stream(messages):
@@ -72,7 +72,7 @@ async def test_agent_chat_stream_with_project_context():
             yield mock_chunk
         return gen()
     
-    with patch("prior.core.agent.acompletion", side_effect=mock_acompletion):
+    with patch("agent.agent.acompletion", side_effect=mock_acompletion):
         messages = [{"role": "user", "content": "Test"}]
         chunks = []
         async for chunk in agent.chat_stream(messages, project_context="test/context"):

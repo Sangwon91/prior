@@ -8,15 +8,15 @@ authors = [
 ]
 requires-python = ">=3.12"
 dependencies = [
-    "textual>=0.80.0",
-    "litellm>=1.50.0",
+    "agent",
     "python-dotenv>=1.0.0",
+    "tui",
 ]
 
 [project.scripts]
 prior = "prior.cli:main"
 
-[project.optional-dependencies]
+[dependency-groups]
 dev = [
     "pytest>=8.0.0",
     "pytest-asyncio>=0.23.0",
@@ -25,3 +25,39 @@ dev = [
 [build-system]
 requires = ["uv_build>=0.9.8,<0.10.0"]
 build-backend = "uv_build"
+
+[tool.pytest.ini_options]
+# Test discovery patterns - pytest will search these directories
+testpaths = [
+    "tests",
+    "packages/agent/tests",
+    "packages/tui/tests",
+]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+# Add all package src directories to Python path so imports work
+pythonpath = [
+    ".",
+    "src",
+    "packages/agent/src",
+    "packages/tui/src",
+]
+# Async test support
+asyncio_mode = "auto"
+# Coverage settings (optional)
+addopts = [
+    "-v",
+    "--strict-markers",
+    "--tb=short",
+]
+
+[tool.uv.workspace]
+members = [
+    "packages/tui",
+    "packages/agent",
+]
+
+[tool.uv.sources]
+tui = { workspace = true }
+agent = { workspace = true }

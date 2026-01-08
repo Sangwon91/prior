@@ -65,4 +65,3 @@ def test_cli_main_loads_dotenv():
         
         # Verify load_dotenv was called
         mock_load_dotenv.assert_called_once()
-

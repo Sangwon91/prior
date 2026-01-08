@@ -8,7 +8,7 @@ from textual.containers import Horizontal, Vertical
 from textual.screen import Screen
 from textual.widgets import Footer, Header, Input, Markdown, Static
 
-from ...core.chat_service import ChatService
+from ..chat_service import ChatService
 from ..widgets import ClipboardInput, MousePassthroughScroll
 
 

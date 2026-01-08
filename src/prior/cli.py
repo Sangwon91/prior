@@ -4,8 +4,8 @@ import os
 
 from dotenv import load_dotenv
 
-from .core.agent import Agent
-from .tui.app import PriorApp
+from agent import Agent
+from tui.app import PriorApp
 
 
 def main() -> None:
@@ -28,4 +28,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

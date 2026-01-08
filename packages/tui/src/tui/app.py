@@ -4,8 +4,8 @@ from pathlib import Path
 
 from textual.app import App
 
-from ..core.agent import Agent
-from ..core.chat_service import ChatService
+from .chat_service import ChatService
+from .protocols import AgentProtocol
 from .screens.chat import ChatScreen
 
 
@@ -25,7 +25,7 @@ class PriorApp(App):
     TITLE = "Prior - Coding Agent"
     SUB_TITLE = "AI-powered coding assistant"
 
-    def __init__(self, agent: Agent, project_root: Path | None = None):
+    def __init__(self, agent: AgentProtocol, project_root: Path | None = None):
         """
         Initialize the app.
 
