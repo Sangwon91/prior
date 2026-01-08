@@ -2,7 +2,6 @@
 
 from .graph import Graph, GraphRun, GraphRunResult
 from .node import BaseNode, End
-from .nodes.conditional import ConditionalNode
 from .state import GraphRunContext
 
 __all__ = [
@@ -12,5 +11,4 @@ __all__ = [
     "BaseNode",
     "End",
     "GraphRunContext",
-    "ConditionalNode",
 ]
