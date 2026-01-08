@@ -1,77 +1,40 @@
-"""Tests for ExecutionContext."""
+"""Tests for GraphRunContext."""
 
-from workflow.state import ExecutionContext
-from workflow.types import ExecutionResult, NodeState
+from dataclasses import dataclass
 
-
-def test_context_set_get():
-    """Test setting and getting context values."""
-    context = ExecutionContext()
-
-    context.set("key1", "value1")
-    context.set("key2", 42)
-
-    assert context.get("key1") == "value1"
-    assert context.get("key2") == 42
-    assert context.get("missing") is None
-    assert context.get("missing", "default") == "default"
+from workflow import GraphRunContext
 
 
-def test_context_has():
-    """Test checking if key exists."""
-    context = ExecutionContext()
+@dataclass
+class TestState:
+    """Test state."""
 
-    assert not context.has("key1")
-
-    context.set("key1", "value1")
-
-    assert context.has("key1")
-    assert not context.has("key2")
+    value: int = 0
+    name: str = ""
 
 
-def test_context_initial_data():
-    """Test context with initial data."""
-    context = ExecutionContext({"key1": "value1", "key2": 42})
+def test_context_state():
+    """Test GraphRunContext state access."""
+    state = TestState(value=42, name="test")
+    ctx = GraphRunContext(state=state)
 
-    assert context.get("key1") == "value1"
-    assert context.get("key2") == 42
-
-
-def test_context_results():
-    """Test setting and getting execution results."""
-    context = ExecutionContext()
-
-    result1 = ExecutionResult("node1", NodeState.COMPLETED, output="output1")
-    result2 = ExecutionResult("node2", NodeState.FAILED, error=ValueError("error"))
-
-    context.set_result("node1", result1)
-    context.set_result("node2", result2)
-
-    assert context.get_result("node1") == result1
-    assert context.get_result("node2") == result2
-    assert context.get_result("node3") is None
+    assert ctx.state.value == 42
+    assert ctx.state.name == "test"
 
 
-def test_context_node_state():
-    """Test getting node state."""
-    context = ExecutionContext()
+def test_context_deps():
+    """Test GraphRunContext deps."""
+    state = TestState()
+    deps = {"service": "test_service"}
 
-    assert context.get_node_state("node1") == NodeState.PENDING
+    ctx = GraphRunContext(state=state, deps=deps)
 
-    result = ExecutionResult("node1", NodeState.RUNNING)
-    context.set_result("node1", result)
-
-    assert context.get_node_state("node1") == NodeState.RUNNING
+    assert ctx.deps == deps
 
 
-def test_context_node_output():
-    """Test getting node output."""
-    context = ExecutionContext()
+def test_context_deps_none():
+    """Test GraphRunContext with no deps."""
+    state = TestState()
+    ctx = GraphRunContext(state=state)
 
-    assert context.get_node_output("node1") is None
-
-    result = ExecutionResult("node1", NodeState.COMPLETED, output="output1")
-    context.set_result("node1", result)
-
-    assert context.get_node_output("node1") == "output1"
-
+    assert ctx.deps is None

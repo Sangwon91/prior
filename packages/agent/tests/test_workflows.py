@@ -1,5 +1,7 @@
 """Tests for agent workflows."""
 
+from __future__ import annotations
+
 import tempfile
 from pathlib import Path
 
@@ -9,7 +11,6 @@ from agent.workflows import (
     create_project_analysis_workflow,
     execute_project_analysis,
 )
-from workflow.types import NodeState
 
 
 @pytest.mark.asyncio
@@ -17,11 +18,8 @@ async def test_create_project_analysis_workflow():
     """Test creating project analysis workflow."""
     graph = create_project_analysis_workflow()
 
-    assert graph.get_node("get_project_tree") is not None
-    assert graph.get_node("analyze_project") is not None
-
-    deps = graph.get_dependencies("analyze_project")
-    assert "get_project_tree" in deps
+    # Graph should have the node classes
+    assert len(graph.node_defs) == 2
 
 
 @pytest.mark.asyncio
@@ -36,19 +34,12 @@ async def test_execute_project_analysis():
         (root / "subdir").mkdir()
         (root / "subdir" / "file3.py").write_text("# test")
 
-        context = await execute_project_analysis(root)
+        result = await execute_project_analysis(root)
 
         # Check results
-        assert context.get_node_state("get_project_tree") == NodeState.COMPLETED
-        assert context.get_node_state("analyze_project") == NodeState.COMPLETED
-
-        # Check context data
-        tree = context.get("project_tree")
-        assert tree is not None
-        assert "file1.py" in tree
-
-        analysis = context.get("analysis")
-        assert analysis is not None
-        assert "file_count" in analysis
-        assert analysis["file_count"] > 0
-
+        assert result is not None
+        assert "file_count" in result
+        assert result["file_count"] > 0
+        assert "total_lines" in result
+        assert "tree" in result
+        assert "file1.py" in result["tree"]

@@ -1,48 +1,38 @@
 """Conditional node for branching workflows."""
 
+from __future__ import annotations
+
 from collections.abc import Callable
-from typing import Any
+from dataclasses import dataclass
+from typing import Generic, TypeVar
 
-from ..node import Node
-from ..state import ExecutionContext
+from ..node import BaseNode, End
+from ..state import DepsT, GraphRunContext, StateT
+
+RunEndT = TypeVar("RunEndT")
 
 
-class ConditionalNode(Node):
-    """Node that conditionally executes based on context."""
+@dataclass
+class ConditionalNode(BaseNode[StateT, DepsT, RunEndT], Generic[StateT, DepsT, RunEndT]):
+    """Node that conditionally branches based on context state."""
 
-    def __init__(
-        self,
-        node_id: str,
-        condition: Callable[[ExecutionContext], bool],
-        true_node_id: str | None = None,
-        false_node_id: str | None = None,
-    ):
+    condition: Callable[[GraphRunContext[StateT, DepsT]], bool]
+    true_node: BaseNode[StateT, DepsT, RunEndT] | End[RunEndT]
+    false_node: BaseNode[StateT, DepsT, RunEndT] | End[RunEndT]
+
+    async def run(
+        self, ctx: GraphRunContext[StateT, DepsT]
+    ) -> BaseNode[StateT, DepsT, RunEndT] | End[RunEndT]:
         """
-        Initialize conditional node.
+        Execute conditional logic and return the appropriate next node.
 
         Args:
-            node_id: Node identifier
-            condition: Function that evaluates condition from context
-            true_node_id: Node ID to execute if condition is True
-            false_node_id: Node ID to execute if condition is False
-        """
-        super().__init__(node_id)
-        self.condition = condition
-        self.true_node_id = true_node_id
-        self.false_node_id = false_node_id
-
-    async def execute(self, context: ExecutionContext) -> Any:
-        """
-        Execute conditional logic.
-
-        Args:
-            context: Execution context
+            ctx: Graph run context
 
         Returns:
-            Boolean result of condition
+            Next node based on condition evaluation
         """
-        result = self.condition(context)
-        context.set(f"{self.id}_condition_result", result)
-        context.set(f"{self.id}_next_node", self.true_node_id if result else self.false_node_id)
-        return result
-
+        if self.condition(ctx):
+            return self.true_node
+        else:
+            return self.false_node

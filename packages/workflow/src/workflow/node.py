@@ -1,48 +1,55 @@
 """Node base class for workflow execution."""
 
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
-from typing import Any
+from dataclasses import dataclass
+from typing import Generic, TypeVar
 
-from .state import ExecutionContext
+from typing_extensions import Never
+
+from .state import DepsT, GraphRunContext, StateT
+
+RunEndT = TypeVar("RunEndT")
 
 
-class Node(ABC):
-    """Base class for workflow nodes."""
+@dataclass
+class End(Generic[RunEndT]):
+    """End node to indicate the graph run should end."""
 
-    def __init__(self, node_id: str):
-        """
-        Initialize node.
+    data: RunEndT | None = None
 
-        Args:
-            node_id: Unique node identifier
-        """
-        self.id = node_id
 
-    @abstractmethod
-    async def execute(self, context: ExecutionContext) -> Any:
-        """
-        Execute the node.
+@dataclass
+class BaseNode(ABC, Generic[StateT, DepsT, RunEndT]):
+    """Base class for workflow nodes, similar to pydantic_graph's BaseNode."""
 
-        Args:
-            context: Execution context
-
-        Returns:
-            Output data
-        """
-        ...
-
-    async def validate(self, context: ExecutionContext) -> bool:
+    async def validate(self, ctx: GraphRunContext[StateT, DepsT]) -> bool:
         """
         Validate if node can be executed.
 
         Args:
-            context: Execution context
+            ctx: Graph run context
 
         Returns:
             True if node can be executed
         """
         return True
 
-    def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(id={self.id!r})"
+    @abstractmethod
+    async def run(
+        self, ctx: GraphRunContext[StateT, DepsT]
+    ) -> BaseNode[StateT, DepsT, RunEndT] | End[RunEndT]:
+        """
+        Execute the node and return the next node to run.
 
+        Args:
+            ctx: Graph run context
+
+        Returns:
+            Next node to execute or End node to terminate execution
+        """
+        ...
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}()"

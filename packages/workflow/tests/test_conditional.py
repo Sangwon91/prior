@@ -1,81 +1,118 @@
 """Tests for ConditionalNode."""
 
+from __future__ import annotations
+
+from dataclasses import dataclass
+
 import pytest
 
-from workflow.graph import Graph
+from workflow import BaseNode, End, Graph, GraphRunContext
 from workflow.nodes.conditional import ConditionalNode
-from workflow.node import Node
-from workflow.state import ExecutionContext
-from workflow.executor import Executor
-from workflow.types import NodeState
 
 
-class SimpleNode(Node):
-    """Simple test node."""
+@dataclass
+class TestState:
+    """Test state for conditional tests."""
 
-    def __init__(self, node_id: str, output: str = "output"):
-        super().__init__(node_id)
-        self.output = output
+    value: int = 0
+    flag: bool = False
 
-    async def execute(self, context):
-        return self.output
+
+@dataclass
+class TrueNode(BaseNode[TestState, None, str]):
+    """Node executed when condition is true."""
+
+    async def run(
+        self, ctx: GraphRunContext[TestState]
+    ) -> End[str]:
+        return End("true_result")
+
+
+@dataclass
+class FalseNode(BaseNode[TestState, None, str]):
+    """Node executed when condition is false."""
+
+    async def run(
+        self, ctx: GraphRunContext[TestState]
+    ) -> End[str]:
+        return End("false_result")
 
 
 @pytest.mark.asyncio
 async def test_conditional_node_true():
     """Test conditional node with true condition."""
-    context = ExecutionContext({"value": 10})
+    state = TestState(value=10)
 
-    def condition(ctx):
-        return ctx.get("value", 0) > 5
+    def condition(ctx: GraphRunContext[TestState]) -> bool:
+        return ctx.state.value > 5
 
-    node = ConditionalNode("cond1", condition, "true_node", "false_node")
+    cond_node = ConditionalNode(
+        condition=condition,
+        true_node=TrueNode(),
+        false_node=FalseNode(),
+    )
 
-    result = await node.execute(context)
+    ctx = GraphRunContext(state=state)
+    next_node = await cond_node.run(ctx)
 
-    assert result is True
-    assert context.get("cond1_condition_result") is True
-    assert context.get("cond1_next_node") == "true_node"
+    assert isinstance(next_node, TrueNode)
 
 
 @pytest.mark.asyncio
 async def test_conditional_node_false():
     """Test conditional node with false condition."""
-    context = ExecutionContext({"value": 3})
+    state = TestState(value=3)
 
-    def condition(ctx):
-        return ctx.get("value", 0) > 5
+    def condition(ctx: GraphRunContext[TestState]) -> bool:
+        return ctx.state.value > 5
 
-    node = ConditionalNode("cond1", condition, "true_node", "false_node")
+    cond_node = ConditionalNode(
+        condition=condition,
+        true_node=TrueNode(),
+        false_node=FalseNode(),
+    )
 
-    result = await node.execute(context)
+    ctx = GraphRunContext(state=state)
+    next_node = await cond_node.run(ctx)
 
-    assert result is False
-    assert context.get("cond1_condition_result") is False
-    assert context.get("cond1_next_node") == "false_node"
+    assert isinstance(next_node, FalseNode)
 
 
 @pytest.mark.asyncio
 async def test_conditional_in_graph():
     """Test conditional node in a workflow graph."""
-    graph = Graph()
+    state = TestState(flag=True)
 
-    def condition(ctx):
-        return ctx.get("flag", False)
+    def condition(ctx: GraphRunContext[TestState]) -> bool:
+        return ctx.state.flag
 
-    cond_node = ConditionalNode("cond", condition, "node_true", "node_false")
-    true_node = SimpleNode("node_true", "true_output")
-    false_node = SimpleNode("node_false", "false_output")
+    cond_node = ConditionalNode(
+        condition=condition,
+        true_node=TrueNode(),
+        false_node=FalseNode(),
+    )
 
-    graph.add_node(cond_node)
-    graph.add_node(true_node, dependencies=["cond"])
-    graph.add_node(false_node, dependencies=["cond"])
+    graph = Graph(nodes=(ConditionalNode, TrueNode, FalseNode))
+    result = await graph.run(cond_node, state=state)
 
-    # Test with flag=True
-    context = ExecutionContext({"flag": True})
-    executor = Executor()
-    await executor.execute(graph, context)
+    assert result.output == "true_result"
 
-    assert context.get_node_state("cond") == NodeState.COMPLETED
-    assert context.get("cond_next_node") == "node_true"
 
+@pytest.mark.asyncio
+async def test_conditional_in_graph_false():
+    """Test conditional node in a workflow graph with false condition."""
+    state = TestState(flag=False)
+
+    def condition(ctx: GraphRunContext[TestState]) -> bool:
+        return ctx.state.flag
+
+    cond_node = ConditionalNode(
+        condition=condition,
+        true_node=TrueNode(),
+        false_node=FalseNode(),
+    )
+
+    graph = Graph(nodes=(ConditionalNode, TrueNode, FalseNode))
+    result = await graph.run(cond_node, state=state)
+
+    assert result.output == "false_result"

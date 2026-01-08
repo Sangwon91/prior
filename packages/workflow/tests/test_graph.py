@@ -1,137 +1,106 @@
 """Tests for Graph class."""
 
+from __future__ import annotations
+
+from dataclasses import dataclass
+
 import pytest
 
-from workflow.graph import Graph
-from workflow.node import Node
+from workflow import BaseNode, End, Graph, GraphRunContext
 
 
-class MockNode(Node):
-    """Mock node implementation for testing."""
+@dataclass
+class TestState:
+    """Test state for graph execution."""
 
-    def __init__(self, node_id: str, output: str = "test"):
-        super().__init__(node_id)
-        self.output = output
-
-    async def execute(self, context):
-        return self.output
+    value: int = 0
+    output: str = ""
 
 
-def test_add_node():
-    """Test adding nodes to graph."""
-    graph = Graph()
-    node = MockNode("node1")
+@dataclass
+class SimpleNode(BaseNode[TestState, None, str]):
+    """Simple test node."""
 
-    graph.add_node(node)
+    output: str = "test"
 
-    assert graph.get_node("node1") == node
-    assert len(graph.get_all_nodes()) == 1
-
-
-def test_add_node_with_dependencies():
-    """Test adding node with dependencies."""
-    graph = Graph()
-    node1 = MockNode("node1")
-    node2 = MockNode("node2")
-
-    graph.add_node(node1)
-    graph.add_node(node2, dependencies=["node1"])
-
-    deps = graph.get_dependencies("node2")
-    assert "node1" in deps
-    assert "node2" in graph.get_dependents("node1")
+    async def run(
+        self, ctx: GraphRunContext[TestState]
+    ) -> End[str]:
+        return End(self.output)
 
 
-def test_add_node_missing_dependency():
-    """Test adding node with missing dependency raises error."""
-    graph = Graph()
-    node = MockNode("node1")
+@dataclass
+class IncrementNode(BaseNode[TestState, None, int]):
+    """Node that increments state value."""
 
-    graph.add_node(node)
-
-    node2 = MockNode("node2")
-    with pytest.raises(ValueError, match="Dependency.*not found"):
-        graph.add_node(node2, dependencies=["missing"])
-
-
-def test_add_edge():
-    """Test adding edge between nodes."""
-    graph = Graph()
-    node1 = MockNode("node1")
-    node2 = MockNode("node2")
-
-    graph.add_node(node1)
-    graph.add_node(node2)
-    graph.add_edge("node1", "node2")
-
-    assert "node1" in graph.get_dependencies("node2")
-    assert "node2" in graph.get_dependents("node1")
+    async def run(
+        self, ctx: GraphRunContext[TestState]
+    ) -> EndNode:
+        ctx.state.value += 1
+        return EndNode()
 
 
-def test_validate_acyclic_graph():
-    """Test validation of acyclic graph."""
-    graph = Graph()
-    node1 = MockNode("node1")
-    node2 = MockNode("node2")
-    node3 = MockNode("node3")
+@dataclass
+class EndNode(BaseNode[TestState, None, int]):
+    """Node that ends with integer result."""
 
-    graph.add_node(node1)
-    graph.add_node(node2, dependencies=["node1"])
-    graph.add_node(node3, dependencies=["node2"])
-
-    is_valid, error = graph.validate()
-    assert is_valid
-    assert error is None
+    async def run(
+        self, ctx: GraphRunContext[TestState]
+    ) -> End[int]:
+        return End(ctx.state.value)
 
 
-def test_validate_cyclic_graph():
-    """Test validation detects cycles."""
-    graph = Graph()
-    node1 = MockNode("node1")
-    node2 = MockNode("node2")
+@pytest.mark.asyncio
+async def test_graph_run_simple():
+    """Test running a simple graph."""
+    graph = Graph(nodes=(SimpleNode,))
+    state = TestState()
 
-    graph.add_node(node1)
-    graph.add_node(node2)
-    graph.add_edge("node1", "node2")
-    graph.add_edge("node2", "node1")  # Creates cycle
+    result = await graph.run(SimpleNode(output="hello"), state=state)
 
-    is_valid, error = graph.validate()
-    assert not is_valid
-    assert error is not None
-    assert "Cycle" in error
+    assert result.output == "hello"
 
 
-def test_get_execution_order():
-    """Test getting execution order."""
-    graph = Graph()
-    node1 = MockNode("node1")
-    node2 = MockNode("node2")
-    node3 = MockNode("node3")
+@pytest.mark.asyncio
+async def test_graph_run_with_state():
+    """Test running a graph that modifies state."""
+    graph = Graph(nodes=(IncrementNode, EndNode))
+    state = TestState(value=5)
 
-    graph.add_node(node1)
-    graph.add_node(node2, dependencies=["node1"])
-    graph.add_node(node3, dependencies=["node1"])
+    result = await graph.run(IncrementNode(), state=state)
 
-    order = graph.get_execution_order()
-
-    # First layer should have node1
-    assert "node1" in order[0]
-    # Second layer should have node2 and node3 (can run in parallel)
-    assert "node2" in order[1]
-    assert "node3" in order[1]
+    assert result.state.value == 6
+    assert result.output == 6
 
 
-def test_get_execution_order_raises_on_cycle():
-    """Test execution order raises error on cycle."""
-    graph = Graph()
-    node1 = MockNode("node1")
-    node2 = MockNode("node2")
+@pytest.mark.asyncio
+async def test_graph_iter():
+    """Test iterating through graph execution."""
+    graph = Graph(nodes=(IncrementNode, EndNode))
+    state = TestState(value=0)
 
-    graph.add_node(node1)
-    graph.add_node(node2)
-    graph.add_edge("node1", "node2")
-    graph.add_edge("node2", "node1")
+    nodes_executed = []
+    async with graph.iter(IncrementNode(), state=state) as run:
+        async for node in run:
+            nodes_executed.append(type(node).__name__)
 
-    with pytest.raises(ValueError, match="cycles"):
-        graph.get_execution_order()
+    assert "IncrementNode" in nodes_executed
+    assert "End" in nodes_executed
+    assert run.result is not None
+    assert run.result.output == 1
 
+
+@pytest.mark.asyncio
+async def test_graph_node_not_in_graph():
+    """Test that running a node not in graph raises error."""
+    graph = Graph(nodes=(SimpleNode,))
+
+    class OtherNode(BaseNode[TestState, None, str]):
+        async def run(self, ctx: GraphRunContext[TestState]) -> End[str]:
+            return End("other")
+
+    state = TestState()
+
+    async with graph.iter(OtherNode(), state=state) as run:
+        with pytest.raises(ValueError, match="not in the graph"):
+            await run.next(OtherNode())

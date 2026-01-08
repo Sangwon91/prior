@@ -1,60 +1,62 @@
 """Example workflows for agent tasks."""
 
+from __future__ import annotations
+
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from tools.filetree import get_project_tree
-from workflow.executor import Executor
-from workflow.graph import Graph
-from workflow.node import Node
-from workflow.state import ExecutionContext
+from workflow import BaseNode, End, Graph, GraphRunContext
 
 
-class GetProjectTreeNode(Node):
+@dataclass
+class ProjectState:
+    """State for project analysis workflow."""
+
+    project_tree: str = ""
+    analysis: dict | None = None
+
+
+@dataclass
+class GetProjectTree(BaseNode[ProjectState, None, dict]):
     """Node that gets project tree structure."""
 
-    def __init__(self, project_root: Path | None = None):
-        """
-        Initialize node.
+    project_root: Path | None = None
 
-        Args:
-            project_root: Project root directory
-        """
-        super().__init__("get_project_tree")
-        self.project_root = project_root
-
-    async def execute(self, context: ExecutionContext) -> str:
+    async def run(
+        self, ctx: GraphRunContext[ProjectState]
+    ) -> AnalyzeProject:
         """
         Execute node to get project tree.
 
         Args:
-            context: Execution context
+            ctx: Graph run context
 
         Returns:
-            Project tree string
+            Next node to execute
         """
         tree = get_project_tree(self.project_root)
-        context.set("project_tree", tree)
-        return tree
+        ctx.state.project_tree = tree
+        return AnalyzeProject()
 
 
-class AnalyzeProjectNode(Node):
+@dataclass
+class AnalyzeProject(BaseNode[ProjectState, None, dict]):
     """Node that analyzes project structure."""
 
-    def __init__(self):
-        """Initialize node."""
-        super().__init__("analyze_project")
-
-    async def execute(self, context: ExecutionContext) -> dict:
+    async def run(
+        self, ctx: GraphRunContext[ProjectState]
+    ) -> End[dict]:
         """
         Analyze project structure from context.
 
         Args:
-            context: Execution context
+            ctx: Graph run context
 
         Returns:
-            Analysis results
+            End node with analysis results
         """
-        tree = context.get("project_tree", "")
+        tree = ctx.state.project_tree
         # Simple analysis: count lines and files
         lines = tree.split("\n")
         file_count = sum(1 for line in lines if "└──" in line or "├──" in line)
@@ -64,33 +66,23 @@ class AnalyzeProjectNode(Node):
             "file_count": file_count,
             "tree": tree,
         }
-        context.set("analysis", analysis)
-        return analysis
+        ctx.state.analysis = analysis
+        return End(analysis)
 
 
-def create_project_analysis_workflow(project_root: Path | None = None) -> Graph:
+def create_project_analysis_workflow() -> Graph[ProjectState, None, dict]:
     """
     Create a workflow for analyzing project structure.
-
-    Args:
-        project_root: Project root directory
 
     Returns:
         Configured workflow graph
     """
-    graph = Graph()
-
-    # Add nodes
-    tree_node = GetProjectTreeNode(project_root)
-    analyze_node = AnalyzeProjectNode()
-
-    graph.add_node(tree_node)
-    graph.add_node(analyze_node, dependencies=["get_project_tree"])
-
-    return graph
+    return Graph(nodes=(GetProjectTree, AnalyzeProject))
 
 
-async def execute_project_analysis(project_root: Path | None = None) -> ExecutionContext:
+async def execute_project_analysis(
+    project_root: Path | None = None,
+) -> dict:
     """
     Execute project analysis workflow.
 
@@ -98,11 +90,9 @@ async def execute_project_analysis(project_root: Path | None = None) -> Executio
         project_root: Project root directory
 
     Returns:
-        Execution context with results
+        Analysis results dictionary
     """
-    graph = create_project_analysis_workflow(project_root)
-    executor = Executor()
-    context = ExecutionContext()
-
-    return await executor.execute(graph, context)
-
+    graph = create_project_analysis_workflow()
+    state = ProjectState()
+    result = await graph.run(GetProjectTree(project_root=project_root), state=state)
+    return result.output

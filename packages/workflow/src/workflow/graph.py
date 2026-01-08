@@ -1,165 +1,213 @@
 """Graph definition for workflow execution."""
 
-from collections import defaultdict
+from __future__ import annotations
 
-from .node import Node
+from collections.abc import AsyncIterator, Sequence
+from contextlib import asynccontextmanager
+from dataclasses import dataclass, field
+from typing import Generic, TypeVar
+
+from .node import BaseNode, End
+from .state import DepsT, GraphRunContext, StateT
+
+RunEndT = TypeVar("RunEndT")
 
 
-class Graph:
-    """Workflow graph with nodes and dependencies."""
+@dataclass
+class GraphRunResult(Generic[StateT, RunEndT]):
+    """The final result of running a graph."""
 
-    def __init__(self):
-        """Initialize empty graph."""
-        self._nodes: dict[str, Node] = {}
-        self._dependencies: dict[str, set[str]] = defaultdict(set)
-        self._dependents: dict[str, set[str]] = defaultdict(set)
+    output: RunEndT | None
+    state: StateT
 
-    def add_node(self, node: Node, dependencies: list[str] | None = None) -> None:
+
+class GraphRun(Generic[StateT, DepsT, RunEndT]):
+    """Context manager for iterating through graph execution."""
+
+    def __init__(
+        self,
+        graph: Graph[StateT, DepsT, RunEndT],
+        start_node: BaseNode[StateT, DepsT, RunEndT],
+        state: StateT,
+        deps: DepsT | None = None,
+    ):
+        self.graph = graph
+        self.state = state
+        self.deps = deps
+        self._next_node: BaseNode[StateT, DepsT, RunEndT] | End[RunEndT] = start_node
+        self._is_started = False
+        self.result: GraphRunResult[StateT, RunEndT] | None = None
+
+    async def __aenter__(self) -> GraphRun[StateT, DepsT, RunEndT]:
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+        pass
+
+    def __aiter__(self) -> AsyncIterator[BaseNode[StateT, DepsT, RunEndT] | End[RunEndT]]:
+        return self
+
+    async def __anext__(
+        self,
+    ) -> BaseNode[StateT, DepsT, RunEndT] | End[RunEndT]:
+        """Use the last returned node as the input to next."""
+        if not self._is_started:
+            self._is_started = True
+            return self._next_node
+
+        if isinstance(self._next_node, End):
+            raise StopAsyncIteration
+
+        return await self.next(self._next_node)
+
+    async def next(
+        self, node: BaseNode[StateT, DepsT, RunEndT] | None = None
+    ) -> BaseNode[StateT, DepsT, RunEndT] | End[RunEndT]:
         """
-        Add a node to the graph.
+        Manually drive the graph run by passing in the node you want to run next.
 
         Args:
-            node: Node to add
-            dependencies: List of node IDs this node depends on
+            node: The node to run next in the graph. If not specified, uses self._next_node.
+
+        Returns:
+            The next node returned by the graph logic, or an End node if the run has completed.
         """
-        if node.id in self._nodes:
-            raise ValueError(f"Node {node.id} already exists in graph")
+        if node is None:
+            if isinstance(self._next_node, End):
+                return self._next_node
+            node = self._next_node
 
-        self._nodes[node.id] = node
+        if not isinstance(node, BaseNode):
+            raise TypeError(f"`next` must be called with a `BaseNode` instance, got {node!r}.")
 
-        if dependencies:
-            for dep_id in dependencies:
-                if dep_id not in self._nodes:
-                    raise ValueError(f"Dependency {dep_id} not found in graph")
-                self._dependencies[node.id].add(dep_id)
-                self._dependents[dep_id].add(node.id)
+        # Check if node is in graph
+        node_class = type(node)
+        if node_class not in self.graph.node_defs:
+            raise ValueError(f"Node `{node}` is not in the graph.")
 
-    def add_edge(self, from_node: str, to_node: str) -> None:
+        # Execute node
+        ctx = GraphRunContext(state=self.state, deps=self.deps)
+        self._next_node = await node.run(ctx)
+
+        # Update state from context
+        self.state = ctx.state
+
+        # If we got an End node, store the result
+        if isinstance(self._next_node, End):
+            self.result = GraphRunResult(
+                output=self._next_node.data,
+                state=self.state,
+            )
+
+        return self._next_node
+
+
+@dataclass
+class Graph(Generic[StateT, DepsT, RunEndT]):
+    """Workflow graph with nodes, similar to pydantic_graph's Graph."""
+
+    node_defs: dict[type[BaseNode[StateT, DepsT, RunEndT]], None] = field(default_factory=dict)
+    name: str | None = None
+
+    def __init__(
+        self,
+        *,
+        nodes: Sequence[type[BaseNode[StateT, DepsT, RunEndT]]],
+        name: str | None = None,
+    ):
         """
-        Add an edge (dependency) between nodes.
+        Create a graph from a sequence of node classes.
 
         Args:
-            from_node: Source node ID
-            to_node: Target node ID
+            nodes: The node classes which make up the graph
+            name: Optional name for the graph
         """
-        if from_node not in self._nodes:
-            raise ValueError(f"Node {from_node} not found in graph")
-        if to_node not in self._nodes:
-            raise ValueError(f"Node {to_node} not found in graph")
+        self.name = name
+        self.node_defs = {node_class: None for node_class in nodes}
+        self._validate_edges()
 
-        self._dependencies[to_node].add(from_node)
-        self._dependents[from_node].add(to_node)
+    def _validate_edges(self) -> None:
+        """Validate that all node return types are valid."""
+        for node_class in self.node_defs:
+            # Check that run method exists and has proper return type
+            if not hasattr(node_class, "run"):
+                raise ValueError(f"Node {node_class} must have a `run` method")
+            # Type checking would be done by type checkers, not at runtime
 
-    def get_node(self, node_id: str) -> Node | None:
+    @asynccontextmanager
+    async def iter(
+        self,
+        start_node: BaseNode[StateT, DepsT, RunEndT],
+        *,
+        state: StateT,
+        deps: DepsT | None = None,
+    ) -> AsyncIterator[GraphRun[StateT, DepsT, RunEndT]]:
         """
-        Get a node by ID.
+        Iterate through graph execution.
 
         Args:
-            node_id: Node identifier
+            start_node: The first node to run
+            state: The initial state of the graph
+            deps: The dependencies of the graph
 
-        Returns:
-            Node or None if not found
+        Yields:
+            GraphRun context manager for iterating through nodes
         """
-        return self._nodes.get(node_id)
+        run = GraphRun(self, start_node, state, deps)
+        async with run:
+            yield run
 
-    def get_dependencies(self, node_id: str) -> set[str]:
+    async def run(
+        self,
+        start_node: BaseNode[StateT, DepsT, RunEndT],
+        *,
+        state: StateT,
+        deps: DepsT | None = None,
+    ) -> GraphRunResult[StateT, RunEndT]:
         """
-        Get dependencies of a node.
+        Run the graph from a starting node until it ends.
 
         Args:
-            node_id: Node identifier
+            start_node: The first node to run
+            state: The initial state of the graph
+            deps: The dependencies of the graph
 
         Returns:
-            Set of dependency node IDs
+            A GraphRunResult containing the final result and state
         """
-        return self._dependencies.get(node_id, set()).copy()
+        async with self.iter(start_node, state=state, deps=deps) as graph_run:
+            async for _node in graph_run:
+                pass
 
-    def get_dependents(self, node_id: str) -> set[str]:
+        if graph_run.result is None:
+            raise RuntimeError("Graph run did not end with an End node")
+
+        return graph_run.result
+
+    def run_sync(
+        self,
+        start_node: BaseNode[StateT, DepsT, RunEndT],
+        *,
+        state: StateT,
+        deps: DepsT | None = None,
+    ) -> GraphRunResult[StateT, RunEndT]:
         """
-        Get nodes that depend on this node.
+        Synchronously run the graph.
 
         Args:
-            node_id: Node identifier
+            start_node: The first node to run
+            state: The initial state of the graph
+            deps: The dependencies of the graph
 
         Returns:
-            Set of dependent node IDs
+            The result of running the graph
         """
-        return self._dependents.get(node_id, set()).copy()
+        import asyncio
 
-    def get_all_nodes(self) -> dict[str, Node]:
-        """
-        Get all nodes in the graph.
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
 
-        Returns:
-            Dictionary of node ID to Node
-        """
-        return self._nodes.copy()
-
-    def validate(self) -> tuple[bool, str | None]:
-        """
-        Validate the graph (check for cycles).
-
-        Returns:
-            Tuple of (is_valid, error_message)
-        """
-        # Check for cycles using DFS
-        visited: set[str] = set()
-        rec_stack: set[str] = set()
-
-        def has_cycle(node_id: str) -> bool:
-            visited.add(node_id)
-            rec_stack.add(node_id)
-
-            for dep_id in self._dependencies.get(node_id, set()):
-                if dep_id not in visited:
-                    if has_cycle(dep_id):
-                        return True
-                elif dep_id in rec_stack:
-                    return True
-
-            rec_stack.remove(node_id)
-            return False
-
-        for node_id in self._nodes:
-            if node_id not in visited:
-                if has_cycle(node_id):
-                    return False, f"Cycle detected involving node {node_id}"
-
-        return True, None
-
-    def get_execution_order(self) -> list[list[str]]:
-        """
-        Get topological sort order for execution.
-
-        Returns:
-            List of layers, where each layer can be executed in parallel
-        """
-        # Kahn's algorithm for topological sort
-        in_degree: dict[str, int] = {
-            node_id: len(self._dependencies.get(node_id, set()))
-            for node_id in self._nodes
-        }
-
-        layers: list[list[str]] = []
-        queue: list[str] = [node_id for node_id, degree in in_degree.items() if degree == 0]
-
-        while queue:
-            layer: list[str] = []
-            next_queue: list[str] = []
-
-            for node_id in queue:
-                layer.append(node_id)
-                for dependent_id in self._dependents.get(node_id, set()):
-                    in_degree[dependent_id] -= 1
-                    if in_degree[dependent_id] == 0:
-                        next_queue.append(dependent_id)
-
-            layers.append(layer)
-            queue = next_queue
-
-        # Check if all nodes were processed
-        if sum(len(layer) for layer in layers) != len(self._nodes):
-            raise ValueError("Graph has cycles, cannot determine execution order")
-
-        return layers
-
+        return loop.run_until_complete(self.run(start_node, state=state, deps=deps))
