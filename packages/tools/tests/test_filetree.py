@@ -3,7 +3,7 @@
 import tempfile
 from pathlib import Path
 
-from tui.filetree import get_project_tree
+from tools.filetree import get_project_tree
 
 
 def test_get_project_tree():
@@ -81,7 +81,7 @@ def test_get_project_tree_default_root():
     """Test get_project_tree uses current directory by default."""
     tree = get_project_tree()
     
-        # Should contain current directory name
+    # Should contain current directory name
     assert isinstance(tree, str)
     assert len(tree) > 0
 

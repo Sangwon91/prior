@@ -32,6 +32,8 @@ testpaths = [
     "tests",
     "packages/agent/tests",
     "packages/tui/tests",
+    "packages/tools/tests",
+    "packages/workflow/tests",
 ]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
@@ -42,6 +44,8 @@ pythonpath = [
     "src",
     "packages/agent/src",
     "packages/tui/src",
+    "packages/tools/src",
+    "packages/workflow/src",
 ]
 # Async test support
 asyncio_mode = "auto"
@@ -56,8 +60,12 @@ addopts = [
 members = [
     "packages/tui",
     "packages/agent",
+    "packages/tools",
+    "packages/workflow",
 ]
 
 [tool.uv.sources]
 tui = { workspace = true }
 agent = { workspace = true }
+tools = { workspace = true }
+workflow = { workspace = true }

@@ -4,7 +4,8 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Any
 
-from .filetree import get_project_tree
+from tools.filetree import get_project_tree
+
 from .protocols import AgentProtocol
 
 

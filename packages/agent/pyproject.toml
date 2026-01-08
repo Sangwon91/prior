@@ -4,12 +4,14 @@ version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 authors = [
-    { name = "Sangwon", email = "lsw91@lgchem.com" }
+    { name = "Sangwon", email = "lsw91.main@gmail.com" }
 ]
 requires-python = ">=3.12"
 dependencies = [
     "litellm>=1.80.11",
     "python-dotenv>=1.2.1",
+    "tools",
+    "workflow",
 ]
 
 [build-system]
