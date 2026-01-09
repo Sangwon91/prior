@@ -25,9 +25,7 @@ class AlwaysValidNode(BaseNode[ValidationState, None, str]):
     async def validate(self, ctx: GraphRunContext[ValidationState]) -> bool:
         return True
 
-    async def run(
-        self, ctx: GraphRunContext[ValidationState]
-    ) -> End[str]:
+    async def run(self, ctx: GraphRunContext[ValidationState]) -> End[str]:
         ctx.state.execution_count += 1
         return End("valid")
 
@@ -39,9 +37,7 @@ class ConditionalValidNode(BaseNode[ValidationState, None, str]):
     async def validate(self, ctx: GraphRunContext[ValidationState]) -> bool:
         return ctx.state.can_execute
 
-    async def run(
-        self, ctx: GraphRunContext[ValidationState]
-    ) -> End[str]:
+    async def run(self, ctx: GraphRunContext[ValidationState]) -> End[str]:
         ctx.state.execution_count += 1
         return End("executed")
 
@@ -55,9 +51,7 @@ class ValueBasedValidNode(BaseNode[ValidationState, None, int]):
     async def validate(self, ctx: GraphRunContext[ValidationState]) -> bool:
         return ctx.state.value >= self.threshold
 
-    async def run(
-        self, ctx: GraphRunContext[ValidationState]
-    ) -> End[int]:
+    async def run(self, ctx: GraphRunContext[ValidationState]) -> End[int]:
         ctx.state.execution_count += 1
         return End(ctx.state.value)
 
@@ -69,9 +63,7 @@ class SkipNode(BaseNode[ValidationState, None, str]):
     async def validate(self, ctx: GraphRunContext[ValidationState]) -> bool:
         return False
 
-    async def run(
-        self, ctx: GraphRunContext[ValidationState]
-    ) -> End[str]:
+    async def run(self, ctx: GraphRunContext[ValidationState]) -> End[str]:
         # This should never be called
         ctx.state.execution_count += 1
         return End("should_not_execute")
@@ -123,12 +115,12 @@ async def test_conditional_validation_fail():
     state = ValidationState(can_execute=False)
 
     graph = Graph(nodes=(ConditionalValidNode,))
-    
+
     # When validation fails, the node should not execute
     # However, in the current implementation, validation is not checked
     # by the graph executor. Let's test the behavior:
-    result = await graph.run(ConditionalValidNode(), state=state)
-    
+    await graph.run(ConditionalValidNode(), state=state)
+
     # Note: Current implementation may still execute even if validate returns False
     # This test documents current behavior
     assert state.execution_count >= 0
@@ -152,10 +144,10 @@ async def test_value_based_validation_fail():
     state = ValidationState(value=3)
 
     graph = Graph(nodes=(ValueBasedValidNode,))
-    
+
     # Test with threshold higher than value
-    result = await graph.run(ValueBasedValidNode(threshold=5), state=state)
-    
+    await graph.run(ValueBasedValidNode(threshold=5), state=state)
+
     # Note: Current implementation may still execute
     # This test documents current behavior
     assert state.execution_count >= 0
@@ -167,7 +159,7 @@ async def test_skip_node():
     state = ValidationState()
 
     graph = Graph(nodes=(SkipNode,))
-    result = await graph.run(SkipNode(), state=state)
+    await graph.run(SkipNode(), state=state)
 
     # Note: Current implementation may still execute
     # This test documents current behavior
@@ -183,9 +175,8 @@ async def test_validation_in_chain():
     chain_node = ChainNode(target=skip_node)
 
     graph = Graph(nodes=(ChainNode, SkipNode))
-    result = await graph.run(chain_node, state=state)
+    await graph.run(chain_node, state=state)
 
     # Chain node should execute, but skip node validation behavior
     # depends on implementation
     assert state.execution_count >= 1
-

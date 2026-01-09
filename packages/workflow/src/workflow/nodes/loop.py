@@ -52,4 +52,3 @@ class LoopNode(Node):
 
         context.set(f"{self.id}_final_iteration", iteration_count)
         return iteration_count
-

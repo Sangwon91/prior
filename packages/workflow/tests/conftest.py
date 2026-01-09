@@ -28,16 +28,16 @@ def pytest_addoption(parser):
 def image_output_dir(request, tmp_path):
     """
     Fixture that provides directory for saving test images.
-    
+
     If --save-images is set, saves to the specified output directory.
     Otherwise, uses temporary directory that will be cleaned up.
-    
+
     Usage:
         def test_my_graph(image_output_dir):
             graph.save_as_image(image_output_dir / "my_graph.png")
     """
     save_images = request.config.getoption("--save-images")
-    
+
     if save_images:
         # Use specified output directory (or default)
         output_dir = Path(request.config.getoption("--image-output-dir"))
@@ -52,10 +52,9 @@ def image_output_dir(request, tmp_path):
 def should_save_images(request):
     """
     Fixture that returns whether images should be saved.
-    
+
     Checks both --save-images flag and SAVE_TEST_IMAGES environment variable.
     """
     save_flag = request.config.getoption("--save-images")
     env_var = os.getenv("SAVE_TEST_IMAGES", "").lower() in ("1", "true", "yes")
     return save_flag or env_var
-

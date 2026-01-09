@@ -20,9 +20,7 @@ class TestState:
 class FailingNode(BaseNode[TestState, None, str]):
     """Node that always fails."""
 
-    async def run(
-        self, ctx: GraphRunContext[TestState]
-    ) -> End[str]:
+    async def run(self, ctx: GraphRunContext[TestState]) -> End[str]:
         raise ValueError("Node failed")
 
 
@@ -32,9 +30,7 @@ class SimpleNode(BaseNode[TestState, None, str]):
 
     output: str = "output"
 
-    async def run(
-        self, ctx: GraphRunContext[TestState]
-    ) -> End[str]:
+    async def run(self, ctx: GraphRunContext[TestState]) -> End[str]:
         return End(self.output)
 
 

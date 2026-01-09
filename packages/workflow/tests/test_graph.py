@@ -23,9 +23,7 @@ class SimpleNode(BaseNode[TestState, None, str]):
 
     output: str = "test"
 
-    async def run(
-        self, ctx: GraphRunContext[TestState]
-    ) -> End[str]:
+    async def run(self, ctx: GraphRunContext[TestState]) -> End[str]:
         return End(self.output)
 
 
@@ -33,9 +31,7 @@ class SimpleNode(BaseNode[TestState, None, str]):
 class IncrementNode(BaseNode[TestState, None, int]):
     """Node that increments state value."""
 
-    async def run(
-        self, ctx: GraphRunContext[TestState]
-    ) -> EndNode:
+    async def run(self, ctx: GraphRunContext[TestState]) -> EndNode:
         ctx.state.value += 1
         return EndNode()
 
@@ -44,9 +40,7 @@ class IncrementNode(BaseNode[TestState, None, int]):
 class EndNode(BaseNode[TestState, None, int]):
     """Node that ends with integer result."""
 
-    async def run(
-        self, ctx: GraphRunContext[TestState]
-    ) -> End[int]:
+    async def run(self, ctx: GraphRunContext[TestState]) -> End[int]:
         return End(ctx.state.value)
 
 
@@ -104,5 +98,3 @@ async def test_graph_node_not_in_graph():
     async with graph.iter(OtherNode(), state=state) as run:
         with pytest.raises(ValueError, match="not in the graph"):
             await run.next(OtherNode())
-
-

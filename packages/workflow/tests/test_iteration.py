@@ -57,9 +57,7 @@ class SimpleNode(BaseNode[IterationState, None, str]):
 
     name: str = "simple"
 
-    async def run(
-        self, ctx: GraphRunContext[IterationState]
-    ) -> End[str]:
+    async def run(self, ctx: GraphRunContext[IterationState]) -> End[str]:
         ctx.state.visited_nodes.append(self.name)
         return End(f"result_{self.name}")
 
@@ -255,4 +253,3 @@ async def test_iter_result_access():
     assert run.result is not None
     assert run.result.output == "result_final"
     assert run.result.state.count == state.count
-

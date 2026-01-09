@@ -21,9 +21,7 @@ class TestState:
 class TrueNode(BaseNode[TestState, None, str]):
     """Node executed when condition is true."""
 
-    async def run(
-        self, ctx: GraphRunContext[TestState]
-    ) -> End[str]:
+    async def run(self, ctx: GraphRunContext[TestState]) -> End[str]:
         return End("true_result")
 
 
@@ -31,9 +29,7 @@ class TrueNode(BaseNode[TestState, None, str]):
 class FalseNode(BaseNode[TestState, None, str]):
     """Node executed when condition is false."""
 
-    async def run(
-        self, ctx: GraphRunContext[TestState]
-    ) -> End[str]:
+    async def run(self, ctx: GraphRunContext[TestState]) -> End[str]:
         return End("false_result")
 
 

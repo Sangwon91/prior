@@ -41,4 +41,3 @@ class PriorApp(App):
         """Called when app is mounted."""
         chat_service = ChatService(self.agent, self.project_root)
         self.push_screen(ChatScreen(chat_service, self.project_root))
-

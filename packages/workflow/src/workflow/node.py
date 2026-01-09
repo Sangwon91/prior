@@ -6,7 +6,6 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Generic, TypeVar
 
-from typing_extensions import Never
 
 from .state import DepsT, GraphRunContext, StateT
 

@@ -40,7 +40,9 @@ class GraphRun(Generic[StateT, DepsT, RunEndT]):
         self.graph = graph
         self.state = state
         self.deps = deps
-        self._next_node: BaseNode[StateT, DepsT, RunEndT] | End[RunEndT] = start_node
+        self._next_node: BaseNode[StateT, DepsT, RunEndT] | End[RunEndT] = (
+            start_node
+        )
         self._is_started = False
         self.result: GraphRunResult[StateT, RunEndT] | None = None
 
@@ -50,7 +52,9 @@ class GraphRun(Generic[StateT, DepsT, RunEndT]):
     async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
         pass
 
-    def __aiter__(self) -> AsyncIterator[BaseNode[StateT, DepsT, RunEndT] | End[RunEndT]]:
+    def __aiter__(
+        self,
+    ) -> AsyncIterator[BaseNode[StateT, DepsT, RunEndT] | End[RunEndT]]:
         return self
 
     async def __anext__(
@@ -84,7 +88,9 @@ class GraphRun(Generic[StateT, DepsT, RunEndT]):
             node = self._next_node
 
         if not isinstance(node, BaseNode):
-            raise TypeError(f"`next` must be called with a `BaseNode` instance, got {node!r}.")
+            raise TypeError(
+                f"`next` must be called with a `BaseNode` instance, got {node!r}."
+            )
 
         # Check if node is in graph
         node_class = type(node)
@@ -112,7 +118,9 @@ class GraphRun(Generic[StateT, DepsT, RunEndT]):
 class Graph(Generic[StateT, DepsT, RunEndT]):
     """Workflow graph with nodes, similar to pydantic_graph's Graph."""
 
-    node_defs: dict[type[BaseNode[StateT, DepsT, RunEndT]], None] = field(default_factory=dict)
+    node_defs: dict[type[BaseNode[StateT, DepsT, RunEndT]], None] = field(
+        default_factory=dict
+    )
     name: str | None = None
 
     def __init__(
@@ -232,7 +240,9 @@ class Graph(Generic[StateT, DepsT, RunEndT]):
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
 
-        return loop.run_until_complete(self.run(start_node, state=state, deps=deps))
+        return loop.run_until_complete(
+            self.run(start_node, state=state, deps=deps)
+        )
 
     def to_mermaid(self) -> str:
         """
@@ -253,17 +263,17 @@ class Graph(Generic[StateT, DepsT, RunEndT]):
     ) -> str:
         """
         Generate a mermaid.ink URL for this graph.
-        
+
         Args:
             format: Output format - "img" (default), "svg", or "pdf"
             theme: Optional theme name (default, neutral, dark, forest)
             bg_color: Optional background color (hex code or named color with ! prefix)
             width: Optional image width in pixels
             height: Optional image height in pixels
-            
+
         Returns:
             URL string for mermaid.ink image
-            
+
         Examples:
             >>> graph = Graph(nodes=(MyNode,))
             >>> url = graph.to_mermaid_ink_url()
@@ -291,7 +301,7 @@ class Graph(Generic[StateT, DepsT, RunEndT]):
     ) -> None:
         """
         Save the graph as an image file using mermaid.ink.
-        
+
         Args:
             filepath: Path where to save the image file
             format: Image format - "png", "jpeg", "webp", "svg", or "pdf" (default: "svg")
@@ -299,10 +309,10 @@ class Graph(Generic[StateT, DepsT, RunEndT]):
             bg_color: Optional background color (hex code or named color with ! prefix)
             width: Optional image width in pixels
             height: Optional image height in pixels
-            
+
         Raises:
             IOError: If the image cannot be downloaded or saved
-            
+
         Examples:
             >>> graph = Graph(nodes=(MyNode,))
             >>> graph.save_as_image("graph.svg")

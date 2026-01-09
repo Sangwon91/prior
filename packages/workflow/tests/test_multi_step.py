@@ -55,9 +55,7 @@ class Step2Node(BaseNode[MultiStepState, None, str]):
 class Step3Node(BaseNode[MultiStepState, None, str]):
     """Third step in multi-step workflow."""
 
-    async def run(
-        self, ctx: GraphRunContext[MultiStepState]
-    ) -> End[str]:
+    async def run(self, ctx: GraphRunContext[MultiStepState]) -> End[str]:
         ctx.state.step = 3
         ctx.state.history.append("step3")
         ctx.state.total += 30
@@ -82,9 +80,7 @@ class ProcessNode(BaseNode[MultiStepState, None, int]):
 class AggregateNode(BaseNode[MultiStepState, None, int]):
     """Node that aggregates results."""
 
-    async def run(
-        self, ctx: GraphRunContext[MultiStepState]
-    ) -> End[int]:
+    async def run(self, ctx: GraphRunContext[MultiStepState]) -> End[int]:
         return End(sum(ctx.state.processed_items))
 
 
@@ -156,7 +152,9 @@ async def test_conditional_multi_step():
     assert result.output == "reached_step_5"
     assert result.state.step == 5
     assert len(result.state.history) == 5
-    assert all(f"conditional_step_{i+1}" in result.state.history for i in range(5))
+    assert all(
+        f"conditional_step_{i + 1}" in result.state.history for i in range(5)
+    )
 
 
 @pytest.mark.asyncio
@@ -177,7 +175,9 @@ async def test_long_chain_workflow():
 
             if self.step_num >= self.max_steps:
                 return End(ctx.state.total)
-            return ChainNode(step_num=self.step_num + 1, max_steps=self.max_steps)
+            return ChainNode(
+                step_num=self.step_num + 1, max_steps=self.max_steps
+            )
 
     state = MultiStepState()
     graph = Graph(nodes=(ChainNode,))
@@ -209,9 +209,7 @@ async def test_multi_step_state_accumulation():
 
     state = MultiStepState()
     graph = Graph(nodes=(AccumulateNode,))
-    result = await graph.run(
-        AccumulateNode(value=1, next_value=2), state=state
-    )
+    result = await graph.run(AccumulateNode(value=1, next_value=2), state=state)
 
     assert result.output == 3
     assert result.state.total == 3
@@ -233,18 +231,14 @@ async def test_branching_multi_step():
 
     @dataclass
     class BranchANode(BaseNode[MultiStepState, None, str]):
-        async def run(
-            self, ctx: GraphRunContext[MultiStepState]
-        ) -> End[str]:
+        async def run(self, ctx: GraphRunContext[MultiStepState]) -> End[str]:
             ctx.state.history.append("branch_a")
             ctx.state.total += 100
             return End("branch_a_complete")
 
     @dataclass
     class BranchBNode(BaseNode[MultiStepState, None, str]):
-        async def run(
-            self, ctx: GraphRunContext[MultiStepState]
-        ) -> End[str]:
+        async def run(self, ctx: GraphRunContext[MultiStepState]) -> End[str]:
             ctx.state.history.append("branch_b")
             ctx.state.total += 200
             return End("branch_b_complete")
@@ -264,4 +258,3 @@ async def test_branching_multi_step():
     assert result2.output == "branch_b_complete"
     assert "branch_b" in result2.state.history
     assert result2.state.total == 201
-

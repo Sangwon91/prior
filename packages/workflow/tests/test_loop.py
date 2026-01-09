@@ -175,4 +175,3 @@ async def test_loop_with_zero_max():
     assert result.state.iteration == 1
     # Should execute once before checking condition
     assert len(result.state.values) == 1
-

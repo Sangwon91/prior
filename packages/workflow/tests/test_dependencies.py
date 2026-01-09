@@ -40,9 +40,7 @@ class NodeWithDeps(BaseNode[DepsState, dict[str, str], str]):
 class NodeWithDepsList(BaseNode[DepsState, list[str], str]):
     """Node that uses list dependencies."""
 
-    async def run(
-        self, ctx: GraphRunContext[DepsState, list[str]]
-    ) -> End[str]:
+    async def run(self, ctx: GraphRunContext[DepsState, list[str]]) -> End[str]:
         if ctx.deps:
             ctx.state.processed_data = ctx.deps.copy()
             return End(f"processed_{len(ctx.deps)}_items")
@@ -69,9 +67,7 @@ class NodeWithOptionalDeps(BaseNode[DepsState, dict | None, str]):
 class NodeWithComplexDeps(BaseNode[DepsState, dict, str]):
     """Node that uses complex dependency structure."""
 
-    async def run(
-        self, ctx: GraphRunContext[DepsState, dict]
-    ) -> End[str]:
+    async def run(self, ctx: GraphRunContext[DepsState, dict]) -> End[str]:
         if ctx.deps:
             config = ctx.deps.get("config", {})
             api_key = config.get("api_key", "missing")
@@ -202,4 +198,3 @@ async def test_deps_passed_through_chain():
 
     assert "first_chain_service_" in result.output
     assert "second_chain_service" in result.output
-

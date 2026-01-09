@@ -17,7 +17,9 @@ class Scheduler:
         """
         self.max_parallel = max_parallel
 
-    async def execute_tasks(self, tasks: list[Coroutine[Any, Any, None]]) -> None:
+    async def execute_tasks(
+        self, tasks: list[Coroutine[Any, Any, None]]
+    ) -> None:
         """
         Execute tasks with parallelism control.
 
@@ -31,9 +33,12 @@ class Scheduler:
             # Execute with semaphore to limit parallelism
             semaphore = asyncio.Semaphore(self.max_parallel)
 
-            async def execute_with_semaphore(task: Coroutine[Any, Any, None]) -> None:
+            async def execute_with_semaphore(
+                task: Coroutine[Any, Any, None],
+            ) -> None:
                 async with semaphore:
                     await task
 
-            await asyncio.gather(*[execute_with_semaphore(task) for task in tasks])
-
+            await asyncio.gather(
+                *[execute_with_semaphore(task) for task in tasks]
+            )

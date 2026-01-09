@@ -70,7 +70,9 @@ class ChatScreen(Screen):
         ("q", "quit", "Quit"),
     ]
 
-    def __init__(self, chat_service: ChatService, project_root: Path | None = None):
+    def __init__(
+        self, chat_service: ChatService, project_root: Path | None = None
+    ):
         """
         Initialize chat screen.
 
@@ -82,7 +84,9 @@ class ChatScreen(Screen):
         self.chat_service = chat_service
         self.project_root = project_root or chat_service.project_root
         self.message_history: list[dict[str, str]] = []
-        self._active_streaming_tasks: set[asyncio.Task] = set()  # Track active streaming tasks
+        self._active_streaming_tasks: set[asyncio.Task] = (
+            set()
+        )  # Track active streaming tasks
 
     def compose(self) -> ComposeResult:
         """Create child widgets."""
@@ -132,7 +136,9 @@ class ChatScreen(Screen):
 
     def _add_user_message(self, content: str) -> None:
         """Add user message to display."""
-        messages_container = self.query_one("#messages-container", MousePassthroughScroll)
+        messages_container = self.query_one(
+            "#messages-container", MousePassthroughScroll
+        )
         user_markdown = Markdown(f"**You:** {content}", classes="user-message")
         messages_container.mount(user_markdown)
         # Scroll to bottom to show new message
@@ -144,17 +150,21 @@ class ChatScreen(Screen):
         try:
             # Get streaming response
             response_chunks: list[str] = []
-            messages_container = self.query_one("#messages-container", MousePassthroughScroll)
-            
+            messages_container = self.query_one(
+                "#messages-container", MousePassthroughScroll
+            )
+
             # Create streaming widget
             streaming_widget = Markdown("", classes="assistant-message")
             messages_container.mount(streaming_widget)
             messages_container.scroll_end(animate=False)
 
-            async for chunk in self.chat_service.stream_response(self.message_history):
+            async for chunk in self.chat_service.stream_response(
+                self.message_history
+            ):
                 response_chunks.append(chunk)
                 current_response += chunk
-                
+
                 # Update streaming markdown widget with current response
                 streaming_widget.update(current_response)
                 # Scroll to bottom to follow streaming
@@ -164,19 +174,27 @@ class ChatScreen(Screen):
 
             # Add complete response to history
             full_response = "".join(response_chunks)
-            self.message_history.append({"role": "assistant", "content": full_response})
-            
+            self.message_history.append(
+                {"role": "assistant", "content": full_response}
+            )
+
             # Replace streaming widget with completed message
-            completed_markdown = Markdown(full_response, classes="assistant-message")
+            completed_markdown = Markdown(
+                full_response, classes="assistant-message"
+            )
             streaming_widget.remove()
             messages_container.mount(completed_markdown)
-            
+
             # Scroll to bottom
             messages_container.scroll_end(animate=False)
 
         except Exception as e:
-            messages_container = self.query_one("#messages-container", MousePassthroughScroll)
-            error_markdown = Markdown(f"**Error:** {str(e)}", classes="assistant-message")
+            messages_container = self.query_one(
+                "#messages-container", MousePassthroughScroll
+            )
+            error_markdown = Markdown(
+                f"**Error:** {str(e)}", classes="assistant-message"
+            )
             messages_container.mount(error_markdown)
             messages_container.scroll_end(animate=False)
 
@@ -185,8 +203,6 @@ class ChatScreen(Screen):
         # Yield control to allow UI updates
         await asyncio.sleep(0)
 
-
     def action_quit(self) -> None:
         """Quit the application."""
         self.app.exit()
-

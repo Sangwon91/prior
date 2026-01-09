@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 from tools.filetree import get_project_tree
@@ -23,9 +23,7 @@ class GetProjectTree(BaseNode[ProjectState, None, dict]):
 
     project_root: Path | None = None
 
-    async def run(
-        self, ctx: GraphRunContext[ProjectState]
-    ) -> AnalyzeProject:
+    async def run(self, ctx: GraphRunContext[ProjectState]) -> AnalyzeProject:
         """
         Execute node to get project tree.
 
@@ -44,9 +42,7 @@ class GetProjectTree(BaseNode[ProjectState, None, dict]):
 class AnalyzeProject(BaseNode[ProjectState, None, dict]):
     """Node that analyzes project structure."""
 
-    async def run(
-        self, ctx: GraphRunContext[ProjectState]
-    ) -> End[dict]:
+    async def run(self, ctx: GraphRunContext[ProjectState]) -> End[dict]:
         """
         Analyze project structure from context.
 
@@ -94,5 +90,7 @@ async def execute_project_analysis(
     """
     graph = create_project_analysis_workflow()
     state = ProjectState()
-    result = await graph.run(GetProjectTree(project_root=project_root), state=state)
+    result = await graph.run(
+        GetProjectTree(project_root=project_root), state=state
+    )
     return result.output

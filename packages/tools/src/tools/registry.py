@@ -39,4 +39,3 @@ def list_tools() -> list[str]:
         List of tool names
     """
     return list(_tools.keys())
-

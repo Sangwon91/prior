@@ -9,7 +9,6 @@ from typing import Any
 import pytest
 
 from tui.chat_service import ChatService
-from tui.protocols import AgentProtocol
 from tui.screens.chat import ChatScreen
 
 
@@ -69,13 +68,15 @@ async def test_chat_screen_compose():
     with tempfile.TemporaryDirectory() as tmpdir:
         app = PriorApp(agent, project_root=Path(tmpdir))
 
-        async with app.run_test() as pilot:
+        async with app.run_test():
             screen = app.screen
             # Check that widgets exist
             input_box = screen.query_one("#input-box", expect_type=None)
             assert input_box is not None
 
-            messages_container = screen.query_one("#messages-container", expect_type=None)
+            messages_container = screen.query_one(
+                "#messages-container", expect_type=None
+            )
             assert messages_container is not None
 
             # streaming-message widget is created dynamically during streaming
@@ -99,12 +100,14 @@ async def test_chat_screen_input_submission():
 
             # Simulate input submission
             from textual.widgets import Input
+
             event = Input.Submitted(input_box, "Test message")
 
             await screen.on_input_submitted(event)
 
             # Wait for streaming to complete (with timeout)
             import asyncio
+
             for _ in range(20):  # Try up to 20 times
                 await asyncio.sleep(0.1)
                 await pilot.pause()
@@ -143,6 +146,7 @@ async def test_chat_screen_allows_multiple_inputs_during_streaming():
 
             # Submit first message
             from textual.widgets import Input
+
             initial_history_len = len(screen.message_history)
             event1 = Input.Submitted(input_box, "First question")
             await screen.on_input_submitted(event1)
@@ -164,7 +168,9 @@ async def test_chat_screen_allows_multiple_inputs_during_streaming():
             # History should have increased (both messages added)
             assert len(screen.message_history) >= initial_history_len + 2
             # Find the second user message
-            user_messages = [msg for msg in screen.message_history if msg["role"] == "user"]
+            user_messages = [
+                msg for msg in screen.message_history if msg["role"] == "user"
+            ]
             assert len(user_messages) >= 2
             assert user_messages[-1]["content"] == "Second question"
 
@@ -179,9 +185,8 @@ async def test_chat_screen_quit_action():
     with tempfile.TemporaryDirectory() as tmpdir:
         app = PriorApp(agent, project_root=Path(tmpdir))
 
-        async with app.run_test() as pilot:
+        async with app.run_test():
             screen = app.screen
             # Quit action should exit app
             screen.action_quit()
             # App should be exiting (exact behavior depends on Textual)
-

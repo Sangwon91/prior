@@ -8,7 +8,6 @@ from typing import Any
 import pytest
 
 from tui.app import PriorApp
-from tui.protocols import AgentProtocol
 
 
 class MockAgent:
@@ -52,9 +51,10 @@ async def test_app_mounts_chat_screen():
     agent = MockAgent()
     app = PriorApp(agent)
 
-    async with app.run_test() as pilot:
+    async with app.run_test():
         # Check that ChatScreen is mounted
         from tui.screens.chat import ChatScreen
+
         assert isinstance(app.screen, ChatScreen)
         # ChatScreen has chat_service, not agent directly
         assert app.screen.chat_service.agent == agent
@@ -66,8 +66,7 @@ async def test_app_title():
     agent = MockAgent()
     app = PriorApp(agent)
 
-    async with app.run_test() as pilot:
+    async with app.run_test():
         # Check header exists
         header = app.screen.query_one("Header")
         assert header is not None
-

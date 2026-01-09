@@ -29,9 +29,7 @@ class SyncNode(BaseNode[SyncState, None, str]):
 
     output: str = "sync_result"
 
-    async def run(
-        self, ctx: GraphRunContext[SyncState]
-    ) -> End[str]:
+    async def run(self, ctx: GraphRunContext[SyncState]) -> End[str]:
         ctx.state.executed = True
         ctx.state.value = 42
         return End(self.output)
@@ -71,9 +69,7 @@ class ConditionalSyncNode(BaseNode[SyncState, None, str]):
 class TrueSyncNode(BaseNode[SyncState, None, str]):
     """Node executed when condition is true."""
 
-    async def run(
-        self, ctx: GraphRunContext[SyncState]
-    ) -> End[str]:
+    async def run(self, ctx: GraphRunContext[SyncState]) -> End[str]:
         return End("true_branch")
 
 
@@ -81,9 +77,7 @@ class TrueSyncNode(BaseNode[SyncState, None, str]):
 class FalseSyncNode(BaseNode[SyncState, None, str]):
     """Node executed when condition is false."""
 
-    async def run(
-        self, ctx: GraphRunContext[SyncState]
-    ) -> End[str]:
+    async def run(self, ctx: GraphRunContext[SyncState]) -> End[str]:
         return End("false_branch")
 
 
@@ -108,10 +102,14 @@ def test_run_sync_vs_async():
     graph = Graph(nodes=(SyncNode,))
 
     # Run async using asyncio.run()
-    result_async = asyncio.run(graph.run(SyncNode(output="test"), state=state_async))
+    result_async = asyncio.run(
+        graph.run(SyncNode(output="test"), state=state_async)
+    )
 
     # Run sync using asyncio.run() to simulate sync behavior
-    result_sync = asyncio.run(graph.run(SyncNode(output="test"), state=state_sync))
+    result_sync = asyncio.run(
+        graph.run(SyncNode(output="test"), state=state_sync)
+    )
 
     # Results should be identical
     assert result_async.output == result_sync.output
@@ -131,7 +129,13 @@ def test_run_sync_multi_step():
     assert result.output == sum(range(1, 6))  # 15
     assert result.state.value == 15
     assert len(result.state.steps) == 5
-    assert result.state.steps == ["step_1", "step_2", "step_3", "step_4", "step_5"]
+    assert result.state.steps == [
+        "step_1",
+        "step_2",
+        "step_3",
+        "step_4",
+        "step_5",
+    ]
 
 
 def test_run_sync_conditional():
@@ -142,11 +146,15 @@ def test_run_sync_conditional():
     graph = Graph(nodes=(ConditionalSyncNode, TrueSyncNode, FalseSyncNode))
 
     # Test true branch
-    result_true = asyncio.run(graph.run(ConditionalSyncNode(), state=state_true))
+    result_true = asyncio.run(
+        graph.run(ConditionalSyncNode(), state=state_true)
+    )
     assert result_true.output == "true_branch"
 
     # Test false branch
-    result_false = asyncio.run(graph.run(ConditionalSyncNode(), state=state_false))
+    result_false = asyncio.run(
+        graph.run(ConditionalSyncNode(), state=state_false)
+    )
     assert result_false.output == "false_branch"
 
 
@@ -177,9 +185,7 @@ def test_run_sync_state_modification():
 
     @dataclass
     class ModifyNode(BaseNode[SyncState, None, int]):
-        async def run(
-            self, ctx: GraphRunContext[SyncState]
-        ) -> End[int]:
+        async def run(self, ctx: GraphRunContext[SyncState]) -> End[int]:
             ctx.state.value = 100
             ctx.state.executed = True
             ctx.state.steps.append("modified")
@@ -200,9 +206,7 @@ def test_run_sync_error_handling():
 
     @dataclass
     class ErrorNode(BaseNode[SyncState, None, str]):
-        async def run(
-            self, ctx: GraphRunContext[SyncState]
-        ) -> End[str]:
+        async def run(self, ctx: GraphRunContext[SyncState]) -> End[str]:
             raise ValueError("Sync execution error")
 
     graph = Graph(nodes=(ErrorNode,))
@@ -234,9 +238,7 @@ def test_run_sync_complex_workflow():
 
     @dataclass
     class FinishNode(BaseNode[SyncState, None, str]):
-        async def run(
-            self, ctx: GraphRunContext[SyncState]
-        ) -> End[str]:
+        async def run(self, ctx: GraphRunContext[SyncState]) -> End[str]:
             ctx.state.steps.append("finish")
             ctx.state.value += 50
             return End(f"completed_{ctx.state.value}")
@@ -247,4 +249,3 @@ def test_run_sync_complex_workflow():
     assert result.output == "completed_100"
     assert result.state.value == 100
     assert result.state.steps == ["start", "process", "finish"]
-

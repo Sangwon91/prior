@@ -45,9 +45,7 @@ class MultiConditionNode(BaseNode[BranchingState, None, str]):
 class BranchANode(BaseNode[BranchingState, None, str]):
     """Branch A node."""
 
-    async def run(
-        self, ctx: GraphRunContext[BranchingState]
-    ) -> End[str]:
+    async def run(self, ctx: GraphRunContext[BranchingState]) -> End[str]:
         ctx.state.path.append("A")
         return End("branch_a")
 
@@ -56,9 +54,7 @@ class BranchANode(BaseNode[BranchingState, None, str]):
 class BranchBNode(BaseNode[BranchingState, None, str]):
     """Branch B node."""
 
-    async def run(
-        self, ctx: GraphRunContext[BranchingState]
-    ) -> End[str]:
+    async def run(self, ctx: GraphRunContext[BranchingState]) -> End[str]:
         ctx.state.path.append("B")
         return End("branch_b")
 
@@ -67,9 +63,7 @@ class BranchBNode(BaseNode[BranchingState, None, str]):
 class BranchCNode(BaseNode[BranchingState, None, str]):
     """Branch C node."""
 
-    async def run(
-        self, ctx: GraphRunContext[BranchingState]
-    ) -> End[str]:
+    async def run(self, ctx: GraphRunContext[BranchingState]) -> End[str]:
         ctx.state.path.append("C")
         return End("branch_c")
 
@@ -97,9 +91,7 @@ class NestedBranchNode(BaseNode[BranchingState, None, str]):
 class EndNode(BaseNode[BranchingState, None, str]):
     """End node for nested branching."""
 
-    async def run(
-        self, ctx: GraphRunContext[BranchingState]
-    ) -> End[str]:
+    async def run(self, ctx: GraphRunContext[BranchingState]) -> End[str]:
         ctx.state.path.append("end")
         return End("nested_complete")
 
@@ -132,9 +124,7 @@ class ConvergeNodeB(BaseNode[BranchingState, None, str]):
 class ConvergeNode(BaseNode[BranchingState, None, str]):
     """Node where branches converge."""
 
-    async def run(
-        self, ctx: GraphRunContext[BranchingState]
-    ) -> End[str]:
+    async def run(self, ctx: GraphRunContext[BranchingState]) -> End[str]:
         ctx.state.path.append("converge")
         return End(f"converged_value_{ctx.state.value}")
 
@@ -175,9 +165,7 @@ class FlagBasedNode(BaseNode[BranchingState, None, str]):
 class FlagNode1(BaseNode[BranchingState, None, str]):
     """Flag node 1."""
 
-    async def run(
-        self, ctx: GraphRunContext[BranchingState]
-    ) -> End[str]:
+    async def run(self, ctx: GraphRunContext[BranchingState]) -> End[str]:
         ctx.state.path.append("flag1")
         return End("both_flags")
 
@@ -186,9 +174,7 @@ class FlagNode1(BaseNode[BranchingState, None, str]):
 class FlagNode2(BaseNode[BranchingState, None, str]):
     """Flag node 2."""
 
-    async def run(
-        self, ctx: GraphRunContext[BranchingState]
-    ) -> End[str]:
+    async def run(self, ctx: GraphRunContext[BranchingState]) -> End[str]:
         ctx.state.path.append("flag2")
         return End("flag1_only")
 
@@ -197,9 +183,7 @@ class FlagNode2(BaseNode[BranchingState, None, str]):
 class FlagNode3(BaseNode[BranchingState, None, str]):
     """Flag node 3."""
 
-    async def run(
-        self, ctx: GraphRunContext[BranchingState]
-    ) -> End[str]:
+    async def run(self, ctx: GraphRunContext[BranchingState]) -> End[str]:
         ctx.state.path.append("flag3")
         return End("flag2_only")
 
@@ -207,7 +191,9 @@ class FlagNode3(BaseNode[BranchingState, None, str]):
 @pytest.mark.asyncio
 async def test_multi_condition_branching():
     """Test branching with multiple conditions."""
-    graph = Graph(nodes=(MultiConditionNode, BranchANode, BranchBNode, BranchCNode))
+    graph = Graph(
+        nodes=(MultiConditionNode, BranchANode, BranchBNode, BranchCNode)
+    )
 
     # Test branch A (value < 0)
     state_a = BranchingState(value=-5)
@@ -331,25 +317,19 @@ async def test_complex_decision_tree():
 
     @dataclass
     class Level3ANode(BaseNode[BranchingState, None, str]):
-        async def run(
-            self, ctx: GraphRunContext[BranchingState]
-        ) -> End[str]:
+        async def run(self, ctx: GraphRunContext[BranchingState]) -> End[str]:
             ctx.state.path.append("L3A")
             return End("level3a")
 
     @dataclass
     class Level3BNode(BaseNode[BranchingState, None, str]):
-        async def run(
-            self, ctx: GraphRunContext[BranchingState]
-        ) -> End[str]:
+        async def run(self, ctx: GraphRunContext[BranchingState]) -> End[str]:
             ctx.state.path.append("L3B")
             return End("level3b")
 
     @dataclass
     class Level3CNode(BaseNode[BranchingState, None, str]):
-        async def run(
-            self, ctx: GraphRunContext[BranchingState]
-        ) -> End[str]:
+        async def run(self, ctx: GraphRunContext[BranchingState]) -> End[str]:
             ctx.state.path.append("L3C")
             return End("level3c")
 
@@ -386,4 +366,3 @@ async def test_complex_decision_tree():
     result4 = await graph.run(Level1Node(), state=state4)
     assert result4.output == "level3c"
     assert "L3C" in result4.state.path
-

@@ -1,7 +1,5 @@
 """Workflow execution engine."""
 
-import asyncio
-from typing import Any
 
 from .graph import Graph
 from .node import Node
@@ -93,7 +91,9 @@ class Executor:
         if tasks:
             await self.scheduler.execute_tasks(tasks)
 
-    async def _execute_node_safe(self, node: Node, context: ExecutionContext) -> None:
+    async def _execute_node_safe(
+        self, node: Node, context: ExecutionContext
+    ) -> None:
         """
         Execute a single node with error handling.
 
@@ -103,11 +103,13 @@ class Executor:
         """
         try:
             await self._execute_node(node, context)
-        except Exception as e:
+        except Exception:
             if not self.continue_on_error:
                 raise
 
-    async def _execute_node(self, node: Node, context: ExecutionContext) -> None:
+    async def _execute_node(
+        self, node: Node, context: ExecutionContext
+    ) -> None:
         """
         Execute a single node.
 
@@ -140,4 +142,3 @@ class Executor:
             )
             # Re-raise to allow error handling strategies
             raise
-

@@ -115,4 +115,3 @@ async def test_countdown_negative_start():
     assert result.state.counter == -4
     assert len(result.state.history) == 1
     assert result.state.history == [-4]
-

@@ -47,4 +47,3 @@ class ChatService:
             messages, project_context=self.project_tree
         ):
             yield chunk
-

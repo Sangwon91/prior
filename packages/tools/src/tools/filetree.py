@@ -53,7 +53,9 @@ def get_project_tree(root: Path | None = None, max_depth: int = 5) -> str:
                 return True
         return False
 
-    def build_tree(path: Path, prefix: str = "", is_last: bool = True, depth: int = 0) -> list[str]:
+    def build_tree(
+        path: Path, prefix: str = "", is_last: bool = True, depth: int = 0
+    ) -> list[str]:
         """Recursively build tree structure."""
         if depth > max_depth:
             return []
@@ -82,7 +84,9 @@ def get_project_tree(root: Path | None = None, max_depth: int = 5) -> str:
 
         for i, child in enumerate(children):
             is_last_child = i == len(children) - 1
-            lines.extend(build_tree(child, new_prefix, is_last_child, depth + 1))
+            lines.extend(
+                build_tree(child, new_prefix, is_last_child, depth + 1)
+            )
 
         return lines
 
@@ -90,4 +94,3 @@ def get_project_tree(root: Path | None = None, max_depth: int = 5) -> str:
     tree_lines.extend(build_tree(root, "", True, 0))
 
     return "\n".join(tree_lines)
-

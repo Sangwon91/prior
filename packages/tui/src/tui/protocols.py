@@ -23,4 +23,3 @@ class AgentProtocol(Protocol):
             Chunks of response text as they arrive
         """
         ...
-

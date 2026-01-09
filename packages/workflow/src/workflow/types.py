@@ -40,4 +40,3 @@ class ExecutionResult:
 
     def __repr__(self) -> str:
         return f"ExecutionResult(node_id={self.node_id!r}, state={self.state.value}, error={self.error})"
-
