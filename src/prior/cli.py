@@ -10,10 +10,16 @@ from dotenv import load_dotenv
 
 from adapter import Bridge, AdapterClient, create_app
 from agent import Agent
-from agent.workflows import execute_chat_loop
+from agent.workflows import (
+    ChatDeps,
+    ChatState,
+    ReceiveMessage,
+    create_chat_workflow,
+)
 from pathlib import Path
 from tui.app import PriorApp
 from tui.chat_service import ChatService
+from workflow import WorkflowRunner
 
 
 def find_available_port(
@@ -134,10 +140,28 @@ def main() -> None:
     # This avoids event loop conflicts
     async def start_chat_workflow():
         """Start chat workflow in background."""
-        await execute_chat_loop(
-            agent=agent,
+        if not agent_adapter:
+            return
+
+        graph = create_chat_workflow()
+        deps = ChatDeps(agent=agent, project_root=project_root)
+
+        def state_factory() -> ChatState:
+            """Create initial chat state with project context."""
+            state = ChatState()
+            if project_root:
+                from tools.filetree import get_project_tree
+
+                state.project_context = get_project_tree(project_root)
+            return state
+
+        runner = WorkflowRunner()
+        await runner.run_loop(
+            graph=graph,
+            start_node=ReceiveMessage(),
+            state_factory=state_factory,
+            deps=deps,
             adapter=agent_adapter,
-            project_root=project_root,
         )
 
     # Create background task

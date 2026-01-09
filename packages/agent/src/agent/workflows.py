@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -88,32 +87,6 @@ def create_project_analysis_workflow() -> Graph[ProjectState, None, dict]:
         Configured workflow graph
     """
     return Graph(nodes=(GetProjectTree, AnalyzeProject))
-
-
-async def execute_project_analysis(
-    project_root: Path | None = None,
-    adapter: "AdapterClient | None" = None,
-) -> dict:
-    """
-    Execute project analysis workflow.
-
-    Args:
-        project_root: Project root directory
-        adapter: Optional adapter client for communication
-
-    Returns:
-        Analysis results dictionary
-    """
-    graph = create_project_analysis_workflow()
-    state = ProjectState()
-
-    result = await graph.run(
-        GetProjectTree(project_root=project_root),
-        state=state,
-        adapter=adapter,
-    )
-
-    return result.output
 
 
 @dataclass
@@ -245,57 +218,3 @@ def create_chat_workflow() -> Graph[ChatState, ChatDeps, None]:
         Configured workflow graph
     """
     return Graph(nodes=(ReceiveMessage, ProcessChat))
-
-
-async def execute_chat_loop(
-    agent: "Agent",
-    adapter: "AdapterClient | None" = None,
-    project_root: Path | None = None,
-) -> None:
-    """
-    Execute chat workflow loop in background.
-
-    Continuously receives messages and processes them with the agent.
-
-    Args:
-        agent: Agent instance to use for chat
-        adapter: Adapter client for receiving/sending messages
-        project_root: Project root directory for context
-    """
-    if not adapter:
-        return
-
-    graph = create_chat_workflow()
-    state = ChatState()
-    deps = ChatDeps(agent=agent, project_root=project_root)
-
-    # Get project context if available
-    if project_root:
-        from tools.filetree import get_project_tree
-
-        state.project_context = get_project_tree(project_root)
-
-    # Run workflow continuously
-    while True:
-        try:
-            result = await graph.run(
-                ReceiveMessage(),
-                state=state,
-                deps=deps,
-                adapter=adapter,
-            )
-            # If workflow ended, break
-            if result.output is not None:
-                break
-        except asyncio.CancelledError:
-            # Allow cancellation to propagate
-            raise
-        except Exception as e:
-            # On error, continue listening
-            # Reset state for next iteration
-            state = ChatState()
-            if project_root:
-                from tools.filetree import get_project_tree
-
-                state.project_context = get_project_tree(project_root)
-            continue

@@ -18,10 +18,9 @@ from agent.workflows import (
     ReceiveMessage,
     create_chat_workflow,
     create_project_analysis_workflow,
-    execute_chat_loop,
-    execute_project_analysis,
 )
 from protocol.models import ChatMessage
+from workflow import WorkflowRunner
 
 
 @pytest.mark.asyncio
@@ -57,15 +56,21 @@ async def test_execute_project_analysis():
         (root / "subdir").mkdir()
         (root / "subdir" / "file3.py").write_text("# test")
 
-        result = await execute_project_analysis(root)
+        graph = create_project_analysis_workflow()
+        runner = WorkflowRunner()
+        result = await runner.run_once(
+            graph=graph,
+            start_node=GetProjectTree(project_root=root),
+            state=ProjectState(),
+        )
 
         # Check results
-        assert result is not None
-        assert "file_count" in result
-        assert result["file_count"] > 0
-        assert "total_lines" in result
-        assert "tree" in result
-        assert "file1.py" in result["tree"]
+        assert result.output is not None
+        assert "file_count" in result.output
+        assert result.output["file_count"] > 0
+        assert "total_lines" in result.output
+        assert "tree" in result.output
+        assert "file1.py" in result.output["tree"]
 
 
 @pytest.mark.asyncio
@@ -254,20 +259,8 @@ async def test_process_chat_node_returns_end_when_no_current_message():
 
 
 @pytest.mark.asyncio
-async def test_execute_chat_loop_returns_immediately_when_no_adapter():
-    """Test execute_chat_loop returns immediately when adapter is missing."""
-    mock_agent = MagicMock()
-
-    # Should return immediately if no adapter
-    await execute_chat_loop(agent=mock_agent, adapter=None)
-
-    # Agent should not be called
-    assert not mock_agent.chat_stream.called
-
-
-@pytest.mark.asyncio
-async def test_execute_chat_loop_receives_and_processes_messages():
-    """Test execute_chat_loop receives messages and processes them with agent."""
+async def test_workflow_runner_run_loop_receives_and_processes_messages():
+    """Test WorkflowRunner run_loop receives messages and processes them."""
     # Create mock agent
     mock_agent = MagicMock()
 
@@ -296,13 +289,23 @@ async def test_execute_chat_loop_receives_and_processes_messages():
     # Set receive to return the async generator directly
     mock_adapter.receive = mock_receive
 
+    graph = create_chat_workflow()
+    deps = ChatDeps(agent=mock_agent)
+
+    def state_factory() -> ChatState:
+        return ChatState()
+
+    runner = WorkflowRunner()
+
     # Run chat loop with timeout
     try:
         await asyncio.wait_for(
-            execute_chat_loop(
-                agent=mock_agent,
+            runner.run_loop(
+                graph=graph,
+                start_node=ReceiveMessage(),
+                state_factory=state_factory,
+                deps=deps,
                 adapter=mock_adapter,
-                project_root=None,
             ),
             timeout=1.0,
         )

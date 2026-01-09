@@ -102,9 +102,15 @@ def test_cli_loads_dotenv_file_on_startup():
 async def test_chat_workflow_processes_user_message_and_returns_agent_response():
     """Test chat workflow processes user message and returns agent response."""
     from agent import Agent
-    from agent.workflows import execute_chat_loop
+    from agent.workflows import (
+        ChatDeps,
+        ChatState,
+        ReceiveMessage,
+        create_chat_workflow,
+    )
     from adapter import AdapterClient
     from protocol.models import ChatMessage
+    from workflow import WorkflowRunner
 
     # Create mock agent
     mock_agent = MagicMock(spec=Agent)
@@ -142,12 +148,22 @@ async def test_chat_workflow_processes_user_message_and_returns_agent_response()
     mock_adapter.receive = mock_receive
     mock_adapter.connect = AsyncMock()
 
+    graph = create_chat_workflow()
+    deps = ChatDeps(agent=mock_agent)
+
+    def state_factory() -> ChatState:
+        return ChatState()
+
+    runner = WorkflowRunner()
+
     # Run chat loop with timeout and cancellation
     task = asyncio.create_task(
-        execute_chat_loop(
-            agent=mock_agent,
+        runner.run_loop(
+            graph=graph,
+            start_node=ReceiveMessage(),
+            state_factory=state_factory,
+            deps=deps,
             adapter=mock_adapter,
-            project_root=None,
         )
     )
 

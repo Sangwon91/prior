@@ -2,6 +2,7 @@
 
 from .graph import Graph, GraphRun, GraphRunResult
 from .node import BaseNode, End
+from .runner import WorkflowRunner
 from .state import GraphRunContext
 
 __all__ = [
@@ -11,4 +12,5 @@ __all__ = [
     "BaseNode",
     "End",
     "GraphRunContext",
+    "WorkflowRunner",
 ]
