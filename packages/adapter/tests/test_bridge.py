@@ -7,22 +7,22 @@ from protocol.models import ChatMessage
 
 
 @pytest.mark.asyncio
-async def test_bridge_send():
-    """Test bridge sends messages."""
+async def test_bridge_send_makes_message_available_via_get_messages():
+    """Test bridge send makes messages available via get_messages."""
     bridge = Bridge()
     message = ChatMessage(role="user", content="Hello")
 
     await bridge.send(message)
 
-    # Check message is in queue
-    received_message = await bridge._message_queue.get()
+    # Verify message is available through public API
+    received_message = await anext(bridge.get_messages())
     assert received_message.role == "user"
     assert received_message.content == "Hello"
 
 
 @pytest.mark.asyncio
-async def test_bridge_subscriber():
-    """Test bridge message subscriber."""
+async def test_bridge_subscriber_receives_sent_messages():
+    """Test bridge subscriber receives messages sent via send."""
     bridge = Bridge()
     message = ChatMessage(role="assistant", content="Hi there")
 
@@ -60,8 +60,8 @@ async def test_bridge_multiple_subscribers():
 
 
 @pytest.mark.asyncio
-async def test_bridge_get_messages():
-    """Test bridge get_messages method."""
+async def test_bridge_get_messages_returns_sent_messages():
+    """Test bridge get_messages returns messages sent via send."""
     bridge = Bridge()
     message = ChatMessage(role="system", content="System message")
 

@@ -12,7 +12,9 @@ import pytest
 from agent.workflows import (
     ChatDeps,
     ChatState,
+    GetProjectTree,
     ProcessChat,
+    ProjectState,
     ReceiveMessage,
     create_chat_workflow,
     create_project_analysis_workflow,
@@ -23,12 +25,24 @@ from protocol.models import ChatMessage
 
 
 @pytest.mark.asyncio
-async def test_create_project_analysis_workflow():
-    """Test creating project analysis workflow."""
+async def test_create_project_analysis_workflow_executes_successfully():
+    """Test project analysis workflow executes and returns results."""
     graph = create_project_analysis_workflow()
 
-    # Graph should have the node classes
-    assert len(graph.node_defs) == 2
+    # Verify workflow can execute and return results
+    with tempfile.TemporaryDirectory() as tmpdir:
+        root = Path(tmpdir)
+        (root / "file1.py").write_text("# test")
+
+        result = await graph.run(
+            GetProjectTree(project_root=root),
+            state=ProjectState(),
+        )
+
+        # Verify workflow executed successfully
+        assert result.output is not None
+        assert "file_count" in result.output
+        assert "total_lines" in result.output
 
 
 @pytest.mark.asyncio
@@ -55,19 +69,64 @@ async def test_execute_project_analysis():
 
 
 @pytest.mark.asyncio
-async def test_create_chat_workflow():
-    """Test creating chat workflow."""
+async def test_create_chat_workflow_processes_messages():
+    """Test chat workflow processes messages correctly."""
     graph = create_chat_workflow()
 
-    # Graph should have the node classes
-    assert len(graph.node_defs) == 2
-    assert ReceiveMessage in graph.node_defs
-    assert ProcessChat in graph.node_defs
+    # Verify workflow can execute with mock adapter
+    mock_adapter = AsyncMock()
+    user_message = ChatMessage(role="user", content="Hello")
+    call_count = 0
+
+    async def mock_receive():
+        nonlocal call_count
+        call_count += 1
+        # First call: yield message
+        if call_count == 1:
+            yield user_message
+        # Subsequent calls: raise CancelledError to stop
+        # This prevents infinite loop when ProcessChat returns ReceiveMessage
+        raise asyncio.CancelledError()
+
+    mock_adapter.receive = mock_receive
+
+    mock_agent = MagicMock()
+
+    async def mock_chat_stream(messages, project_context=""):
+        yield "Response"
+
+    mock_agent.chat_stream = mock_chat_stream
+    mock_agent.adapter = None
+
+    state = ChatState()
+    deps = ChatDeps(agent=mock_agent)
+
+    # Run workflow with timeout to prevent infinite wait
+    # ProcessChat returns ReceiveMessage, which will try to receive again
+    # but mock_receive() raises CancelledError, causing workflow to stop
+    try:
+        result = await asyncio.wait_for(
+            graph.run(
+                ReceiveMessage(),
+                state=state,
+                deps=deps,
+                adapter=mock_adapter,
+            ),
+            timeout=1.0,
+        )
+    except (asyncio.TimeoutError, asyncio.CancelledError):
+        # Expected - workflow stops when no more messages
+        pass
+
+    # Verify message was processed
+    assert len(state.message_history) > 0
+    assert state.message_history[0]["role"] == "user"
+    assert state.message_history[0]["content"] == "Hello"
 
 
 @pytest.mark.asyncio
-async def test_receive_message_node():
-    """Test ReceiveMessage node receives user messages."""
+async def test_receive_message_node_receives_and_stores_user_message():
+    """Test ReceiveMessage node receives user messages and stores them."""
     from workflow import GraphRunContext
 
     # Create mock adapter
@@ -98,8 +157,8 @@ async def test_receive_message_node():
 
 
 @pytest.mark.asyncio
-async def test_receive_message_node_no_adapter():
-    """Test ReceiveMessage node handles missing adapter."""
+async def test_receive_message_node_returns_end_when_no_adapter():
+    """Test ReceiveMessage node returns End node when adapter is missing."""
     from workflow import GraphRunContext
 
     # Create state and context without adapter
@@ -118,8 +177,8 @@ async def test_receive_message_node_no_adapter():
 
 
 @pytest.mark.asyncio
-async def test_process_chat_node():
-    """Test ProcessChat node processes messages with agent."""
+async def test_process_chat_node_processes_message_and_updates_history():
+    """Test ProcessChat node processes messages with agent and updates history."""
     from workflow import GraphRunContext
 
     # Create mock agent
@@ -156,8 +215,8 @@ async def test_process_chat_node():
 
 
 @pytest.mark.asyncio
-async def test_process_chat_node_no_deps():
-    """Test ProcessChat node handles missing deps."""
+async def test_process_chat_node_returns_end_when_deps_missing():
+    """Test ProcessChat node returns End node when dependencies are missing."""
     from workflow import GraphRunContext
 
     # Create state and context without deps
@@ -175,8 +234,8 @@ async def test_process_chat_node_no_deps():
 
 
 @pytest.mark.asyncio
-async def test_process_chat_node_no_message():
-    """Test ProcessChat node handles missing current message."""
+async def test_process_chat_node_returns_end_when_no_current_message():
+    """Test ProcessChat node returns End node when current message is missing."""
     from workflow import GraphRunContext
 
     # Create state without current message
@@ -195,8 +254,8 @@ async def test_process_chat_node_no_message():
 
 
 @pytest.mark.asyncio
-async def test_execute_chat_loop_no_adapter():
-    """Test execute_chat_loop handles missing adapter."""
+async def test_execute_chat_loop_returns_immediately_when_no_adapter():
+    """Test execute_chat_loop returns immediately when adapter is missing."""
     mock_agent = MagicMock()
 
     # Should return immediately if no adapter
@@ -207,8 +266,8 @@ async def test_execute_chat_loop_no_adapter():
 
 
 @pytest.mark.asyncio
-async def test_execute_chat_loop_receives_and_processes():
-    """Test execute_chat_loop receives and processes messages."""
+async def test_execute_chat_loop_receives_and_processes_messages():
+    """Test execute_chat_loop receives messages and processes them with agent."""
     # Create mock agent
     mock_agent = MagicMock()
 

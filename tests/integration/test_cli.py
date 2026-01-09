@@ -9,8 +9,8 @@ import pytest
 from prior.cli import main
 
 
-def test_cli_main_with_model_env():
-    """Test CLI main with model environment variable."""
+def test_cli_uses_model_from_environment_variable():
+    """Test CLI uses model specified in PRIOR_MODEL environment variable."""
     with patch.dict(os.environ, {"PRIOR_MODEL": "test-model"}):
         with (
             patch("prior.cli.load_dotenv"),
@@ -41,8 +41,8 @@ def test_cli_main_with_model_env():
             mock_app_instance.run.assert_called_once()
 
 
-def test_cli_main_default_model():
-    """Test CLI main uses default model."""
+def test_cli_uses_default_model_when_no_environment_variable():
+    """Test CLI uses default model when PRIOR_MODEL is not set."""
     with patch.dict(os.environ, {}, clear=True):
         with (
             patch("prior.cli.load_dotenv"),
@@ -70,8 +70,8 @@ def test_cli_main_default_model():
             assert mock_agent_class.call_count == 1
 
 
-def test_cli_main_loads_dotenv():
-    """Test CLI main loads .env file."""
+def test_cli_loads_dotenv_file_on_startup():
+    """Test CLI loads .env file when starting."""
     with (
         patch("prior.cli.load_dotenv") as mock_load_dotenv,
         patch("prior.cli.Agent") as mock_agent_class,
@@ -99,8 +99,8 @@ def test_cli_main_loads_dotenv():
 
 
 @pytest.mark.asyncio
-async def test_chat_workflow_integration():
-    """Test full chat workflow: message send → agent process → response."""
+async def test_chat_workflow_processes_user_message_and_returns_agent_response():
+    """Test chat workflow processes user message and returns agent response."""
     from agent import Agent
     from agent.workflows import execute_chat_loop
     from adapter import AdapterClient
@@ -166,8 +166,8 @@ async def test_chat_workflow_integration():
 
 
 @pytest.mark.asyncio
-async def test_chat_workflow_message_flow():
-    """Test that messages flow through the chat workflow correctly."""
+async def test_chat_workflow_message_flow_through_workflow():
+    """Test messages flow through chat workflow correctly."""
     from agent.workflows import (
         ChatDeps,
         ChatState,

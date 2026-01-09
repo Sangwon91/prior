@@ -13,8 +13,8 @@ class TestState:
     name: str = ""
 
 
-def test_context_state():
-    """Test GraphRunContext state access."""
+def test_graph_run_context_provides_access_to_state():
+    """Test GraphRunContext provides access to state."""
     state = TestState(value=42, name="test")
     ctx = GraphRunContext(state=state)
 
@@ -22,8 +22,8 @@ def test_context_state():
     assert ctx.state.name == "test"
 
 
-def test_context_deps():
-    """Test GraphRunContext deps."""
+def test_graph_run_context_provides_access_to_deps():
+    """Test GraphRunContext provides access to dependencies."""
     state = TestState()
     deps = {"service": "test_service"}
 
@@ -32,8 +32,8 @@ def test_context_deps():
     assert ctx.deps == deps
 
 
-def test_context_deps_none():
-    """Test GraphRunContext with no deps."""
+def test_graph_run_context_allows_none_deps():
+    """Test GraphRunContext allows None for dependencies."""
     state = TestState()
     ctx = GraphRunContext(state=state)
 

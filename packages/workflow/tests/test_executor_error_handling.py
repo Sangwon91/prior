@@ -35,8 +35,8 @@ class SimpleNode(BaseNode[TestState, None, str]):
 
 
 @pytest.mark.asyncio
-async def test_graph_raises_on_error():
-    """Test graph raises exception on node failure."""
+async def test_graph_raises_exception_when_node_fails():
+    """Test graph raises exception when node execution fails."""
     graph = Graph(nodes=(FailingNode,))
     state = TestState()
 

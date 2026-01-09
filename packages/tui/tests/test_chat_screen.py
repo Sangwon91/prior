@@ -56,8 +56,8 @@ class MockChatService(ChatService):
 
 
 @pytest.mark.asyncio
-async def test_chat_screen_initialization():
-    """Test ChatScreen can be initialized."""
+async def test_chat_screen_initializes_with_chat_service_and_project_root():
+    """Test ChatScreen initializes with chat service and project root."""
     with tempfile.TemporaryDirectory() as tmpdir:
         chat_service = MockChatService(project_root=Path(tmpdir))
         screen = ChatScreen(chat_service, project_root=Path(tmpdir))
@@ -68,8 +68,8 @@ async def test_chat_screen_initialization():
 
 
 @pytest.mark.asyncio
-async def test_chat_screen_compose():
-    """Test ChatScreen compose method."""
+async def test_chat_screen_renders_input_and_messages_widgets():
+    """Test ChatScreen renders input box and messages container widgets."""
     from tui.app import PriorApp
 
     mock_adapter = MockAdapter()
@@ -91,8 +91,8 @@ async def test_chat_screen_compose():
 
 
 @pytest.mark.asyncio
-async def test_chat_screen_input_submission():
-    """Test ChatScreen handles input submission."""
+async def test_chat_screen_adds_message_to_history_and_sends_via_adapter():
+    """Test ChatScreen adds message to history and sends via adapter on input."""
     from tui.app import PriorApp
 
     mock_adapter = MockAdapter()
@@ -129,8 +129,8 @@ async def test_chat_screen_input_submission():
 
 
 @pytest.mark.asyncio
-async def test_chat_screen_allows_multiple_inputs_during_streaming():
-    """Test that input is allowed during streaming (multiple questions)."""
+async def test_chat_screen_allows_multiple_inputs_while_processing():
+    """Test ChatScreen allows submitting multiple messages while processing."""
     from tui.app import PriorApp
 
     mock_adapter = MockAdapter()
@@ -175,8 +175,8 @@ async def test_chat_screen_allows_multiple_inputs_during_streaming():
 
 
 @pytest.mark.asyncio
-async def test_chat_screen_quit_action():
-    """Test quit action."""
+async def test_chat_screen_quit_action_exits_app():
+    """Test ChatScreen quit action exits the application."""
     from tui.app import PriorApp
 
     mock_adapter = MockAdapter()

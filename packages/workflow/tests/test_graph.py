@@ -45,8 +45,8 @@ class EndNode(BaseNode[TestState, None, int]):
 
 
 @pytest.mark.asyncio
-async def test_graph_run_simple():
-    """Test running a simple graph."""
+async def test_graph_executes_single_node_and_returns_result():
+    """Test graph executes single node and returns result."""
     graph = Graph(nodes=(SimpleNode,))
     state = TestState()
 
@@ -56,8 +56,8 @@ async def test_graph_run_simple():
 
 
 @pytest.mark.asyncio
-async def test_graph_run_with_state():
-    """Test running a graph that modifies state."""
+async def test_graph_executes_node_that_modifies_state():
+    """Test graph executes node that modifies state and returns updated state."""
     graph = Graph(nodes=(IncrementNode, EndNode))
     state = TestState(value=5)
 
@@ -68,8 +68,8 @@ async def test_graph_run_with_state():
 
 
 @pytest.mark.asyncio
-async def test_graph_iter():
-    """Test iterating through graph execution."""
+async def test_graph_iter_yields_executed_nodes():
+    """Test graph iter yields nodes as they are executed."""
     graph = Graph(nodes=(IncrementNode, EndNode))
     state = TestState(value=0)
 
@@ -85,8 +85,8 @@ async def test_graph_iter():
 
 
 @pytest.mark.asyncio
-async def test_graph_node_not_in_graph():
-    """Test that running a node not in graph raises error."""
+async def test_graph_raises_error_when_node_not_in_graph():
+    """Test graph raises error when trying to run node not in graph."""
     graph = Graph(nodes=(SimpleNode,))
 
     class OtherNode(BaseNode[TestState, None, str]):

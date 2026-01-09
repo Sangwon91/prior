@@ -86,8 +86,8 @@ class ChainNode(BaseNode[ValidationState, None, str]):
 
 
 @pytest.mark.asyncio
-async def test_always_valid_node():
-    """Test node that always passes validation."""
+async def test_node_with_always_valid_validation_executes_successfully():
+    """Test node with always-valid validation executes successfully."""
     state = ValidationState()
 
     graph = Graph(nodes=(AlwaysValidNode,))
@@ -98,8 +98,8 @@ async def test_always_valid_node():
 
 
 @pytest.mark.asyncio
-async def test_conditional_validation_pass():
-    """Test conditional validation that passes."""
+async def test_node_with_conditional_validation_executes_when_condition_true():
+    """Test node with conditional validation executes when condition is true."""
     state = ValidationState(can_execute=True)
 
     graph = Graph(nodes=(ConditionalValidNode,))
@@ -110,8 +110,8 @@ async def test_conditional_validation_pass():
 
 
 @pytest.mark.asyncio
-async def test_conditional_validation_fail():
-    """Test conditional validation that fails."""
+async def test_node_with_conditional_validation_behavior_when_condition_false():
+    """Test node with conditional validation behavior when condition is false."""
     state = ValidationState(can_execute=False)
 
     graph = Graph(nodes=(ConditionalValidNode,))
@@ -127,8 +127,8 @@ async def test_conditional_validation_fail():
 
 
 @pytest.mark.asyncio
-async def test_value_based_validation_pass():
-    """Test value-based validation that passes."""
+async def test_node_with_value_based_validation_executes_when_value_meets_threshold():
+    """Test node with value-based validation executes when value meets threshold."""
     state = ValidationState(value=10)
 
     graph = Graph(nodes=(ValueBasedValidNode,))
@@ -139,8 +139,8 @@ async def test_value_based_validation_pass():
 
 
 @pytest.mark.asyncio
-async def test_value_based_validation_fail():
-    """Test value-based validation that fails."""
+async def test_node_with_value_based_validation_behavior_when_value_below_threshold():
+    """Test node with value-based validation behavior when value below threshold."""
     state = ValidationState(value=3)
 
     graph = Graph(nodes=(ValueBasedValidNode,))
@@ -154,8 +154,8 @@ async def test_value_based_validation_fail():
 
 
 @pytest.mark.asyncio
-async def test_skip_node():
-    """Test node that always fails validation."""
+async def test_node_with_always_failing_validation_behavior():
+    """Test node with always-failing validation behavior."""
     state = ValidationState()
 
     graph = Graph(nodes=(SkipNode,))
@@ -167,8 +167,8 @@ async def test_skip_node():
 
 
 @pytest.mark.asyncio
-async def test_validation_in_chain():
-    """Test validation in a chain of nodes."""
+async def test_validation_behavior_in_chain_of_nodes():
+    """Test validation behavior when nodes are chained together."""
     state = ValidationState(can_execute=True)
 
     skip_node = SkipNode()

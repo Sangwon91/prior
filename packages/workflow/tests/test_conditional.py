@@ -60,8 +60,8 @@ class CheckFlagNode(BaseNode[TestState, None, str]):
 
 
 @pytest.mark.asyncio
-async def test_conditional_node_true():
-    """Test conditional branching with true condition."""
+async def test_conditional_node_returns_true_branch_when_condition_true():
+    """Test conditional node returns true branch when condition is true."""
     state = TestState(value=10)
 
     ctx = GraphRunContext(state=state)
@@ -72,8 +72,8 @@ async def test_conditional_node_true():
 
 
 @pytest.mark.asyncio
-async def test_conditional_node_false():
-    """Test conditional branching with false condition."""
+async def test_conditional_node_returns_false_branch_when_condition_false():
+    """Test conditional node returns false branch when condition is false."""
     state = TestState(value=3)
 
     ctx = GraphRunContext(state=state)
@@ -84,8 +84,8 @@ async def test_conditional_node_false():
 
 
 @pytest.mark.asyncio
-async def test_conditional_in_graph():
-    """Test conditional branching in a workflow graph."""
+async def test_conditional_branching_in_workflow_graph_executes_true_branch():
+    """Test conditional branching in workflow graph executes true branch."""
     state = TestState(flag=True)
 
     graph = Graph(nodes=(CheckFlagNode, TrueNode, FalseNode))
@@ -95,8 +95,8 @@ async def test_conditional_in_graph():
 
 
 @pytest.mark.asyncio
-async def test_conditional_in_graph_false():
-    """Test conditional branching in a workflow graph with false condition."""
+async def test_conditional_branching_in_workflow_graph_executes_false_branch():
+    """Test conditional branching in workflow graph executes false branch."""
     state = TestState(flag=False)
 
     graph = Graph(nodes=(CheckFlagNode, TrueNode, FalseNode))

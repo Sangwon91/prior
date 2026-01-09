@@ -7,8 +7,8 @@ from adapter.connection_manager import ConnectionManager
 
 
 @pytest.mark.asyncio
-async def test_connection_manager_connect():
-    """Test connection manager connect."""
+async def test_connection_manager_connect_adds_websocket_to_active_connections():
+    """Test connection manager connect adds websocket to active connections."""
     manager = ConnectionManager()
     mock_websocket = AsyncMock()
 
@@ -19,8 +19,8 @@ async def test_connection_manager_connect():
 
 
 @pytest.mark.asyncio
-async def test_connection_manager_disconnect():
-    """Test connection manager disconnect."""
+async def test_connection_manager_disconnect_removes_websocket_from_active_connections():
+    """Test connection manager disconnect removes websocket from connections."""
     manager = ConnectionManager()
     mock_websocket = AsyncMock()
 
@@ -32,8 +32,8 @@ async def test_connection_manager_disconnect():
 
 
 @pytest.mark.asyncio
-async def test_connection_manager_send_personal_message():
-    """Test connection manager send personal message."""
+async def test_connection_manager_send_personal_message_sends_to_specific_websocket():
+    """Test connection manager send_personal_message sends to specific websocket."""
     manager = ConnectionManager()
     mock_websocket = AsyncMock()
 
@@ -44,8 +44,8 @@ async def test_connection_manager_send_personal_message():
 
 
 @pytest.mark.asyncio
-async def test_connection_manager_broadcast():
-    """Test connection manager broadcast."""
+async def test_connection_manager_broadcast_sends_to_all_active_connections():
+    """Test connection manager broadcast sends message to all active connections."""
     manager = ConnectionManager()
     mock_websocket1 = AsyncMock()
     mock_websocket2 = AsyncMock()
@@ -60,8 +60,8 @@ async def test_connection_manager_broadcast():
 
 
 @pytest.mark.asyncio
-async def test_connection_manager_broadcast_removes_failed():
-    """Test connection manager removes failed connections."""
+async def test_connection_manager_broadcast_removes_failed_connections():
+    """Test connection manager broadcast removes connections that fail to send."""
     manager = ConnectionManager()
     mock_websocket1 = AsyncMock()
     mock_websocket2 = AsyncMock()
@@ -81,8 +81,8 @@ async def test_connection_manager_broadcast_removes_failed():
 
 
 @pytest.mark.asyncio
-async def test_connection_manager_receive_messages():
-    """Test connection manager receive messages."""
+async def test_connection_manager_receive_messages_yields_messages_from_websocket():
+    """Test connection manager receive_messages yields messages from websocket."""
     manager = ConnectionManager()
     mock_websocket = AsyncMock()
 

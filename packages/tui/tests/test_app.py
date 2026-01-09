@@ -28,8 +28,8 @@ class MockAdapter:
 
 
 @pytest.mark.asyncio
-async def test_app_initialization():
-    """Test PriorApp can be initialized."""
+async def test_app_initializes_with_chat_service():
+    """Test PriorApp initializes with chat service and correct title."""
     mock_adapter = MockAdapter()
     chat_service = ChatService(adapter=mock_adapter)
     app = PriorApp(chat_service=chat_service)
@@ -40,8 +40,8 @@ async def test_app_initialization():
 
 
 @pytest.mark.asyncio
-async def test_app_with_project_root():
-    """Test PriorApp with project root."""
+async def test_app_stores_project_root_when_provided():
+    """Test PriorApp stores project root when provided."""
     mock_adapter = MockAdapter()
     chat_service = ChatService(adapter=mock_adapter)
 
@@ -52,8 +52,8 @@ async def test_app_with_project_root():
 
 
 @pytest.mark.asyncio
-async def test_app_mounts_chat_screen():
-    """Test PriorApp mounts ChatScreen on mount."""
+async def test_app_mounts_chat_screen_on_startup():
+    """Test PriorApp mounts ChatScreen when app starts."""
     mock_adapter = MockAdapter()
     chat_service = ChatService(adapter=mock_adapter)
     app = PriorApp(chat_service=chat_service)
@@ -68,8 +68,8 @@ async def test_app_mounts_chat_screen():
 
 
 @pytest.mark.asyncio
-async def test_app_title():
-    """Test app displays correct title."""
+async def test_app_displays_header_with_title():
+    """Test app displays header widget with title when running."""
     mock_adapter = MockAdapter()
     chat_service = ChatService(adapter=mock_adapter)
     app = PriorApp(chat_service=chat_service)

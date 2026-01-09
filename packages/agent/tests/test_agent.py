@@ -7,21 +7,21 @@ import pytest
 from agent import Agent
 
 
-def test_agent_initialization():
-    """Test Agent can be initialized."""
+def test_agent_initializes_with_custom_model():
+    """Test Agent initializes with specified model."""
     agent = Agent(model="test-model")
     assert agent.model == "test-model"
 
 
-def test_agent_default_model():
-    """Test Agent uses default model."""
+def test_agent_uses_default_model_when_no_model_specified():
+    """Test Agent uses default model when no model is specified."""
     agent = Agent()
     assert agent.model == "claude-sonnet-4-5"
 
 
 @pytest.mark.asyncio
-async def test_agent_chat_stream():
-    """Test Agent chat_stream method."""
+async def test_agent_chat_stream_yields_response_chunks():
+    """Test Agent chat_stream yields response chunks correctly."""
     agent = Agent(model="test-model")
 
     # Mock LiteLLM response
@@ -48,12 +48,14 @@ async def test_agent_chat_stream():
         async for chunk in agent.chat_stream(messages):
             chunks.append(chunk)
 
-        assert chunks == ["Hello", " World"]
+        # Verify we received all chunks
+        assert len(chunks) == 2
+        assert "".join(chunks) == "Hello World"
 
 
 @pytest.mark.asyncio
-async def test_agent_chat_stream_with_project_context():
-    """Test Agent chat_stream includes project context."""
+async def test_agent_chat_stream_includes_project_context_in_system_message():
+    """Test Agent chat_stream includes project context as system message."""
     agent = Agent(model="test-model")
 
     mock_chunk = MagicMock()
@@ -62,7 +64,7 @@ async def test_agent_chat_stream_with_project_context():
     mock_chunk.choices[0].delta.content = "Response"
 
     async def mock_acompletion(*args, **kwargs):
-        # Check that system message with project context is included
+        # Verify that system message with project context is included
         messages = kwargs.get("messages", [])
         assert len(messages) > 0
         assert messages[0]["role"] == "system"
@@ -81,4 +83,6 @@ async def test_agent_chat_stream_with_project_context():
         ):
             chunks.append(chunk)
 
+        # Verify response was received
         assert len(chunks) > 0
+        assert "Response" in chunks

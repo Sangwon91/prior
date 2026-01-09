@@ -87,13 +87,7 @@ uv run --package workflow pytest packages/workflow/tests -v
 
 Both approaches are valid. Choose based on context and convenience.
 
-### Setting PYTHONPATH
 
-For some commands, you may need to set `PYTHONPATH` to include the package source:
-
-```bash
-PYTHONPATH=packages/workflow/src uv run pytest packages/workflow/tests -v
-```
 
 ## Code Formatting with ruff
 
@@ -219,6 +213,215 @@ make test-prior
 - **Always** when fixing bugs (write a test that reproduces the bug first)
 - **Always** when refactoring (ensure existing tests cover the behavior)
 
+## Test Writing Guidelines
+
+**Write tests that are clear, maintainable, and focus on behavior rather than implementation details.**
+
+### Test Naming
+
+**Test names should clearly describe what is being tested and what the expected outcome is.**
+
+Use the pattern: `test_<what>_<condition>_<expected_result>`
+
+```python
+# Good - clear what is being tested
+def test_agent_initializes_with_custom_model():
+    """Test Agent initializes with specified model."""
+    pass
+
+def test_chat_workflow_processes_user_message_and_returns_agent_response():
+    """Test chat workflow processes user message and returns response."""
+    pass
+
+def test_bridge_send_makes_message_available_via_get_messages():
+    """Test bridge send makes messages available via get_messages."""
+    pass
+
+# Bad - unclear what is being tested
+def test_agent_initialization():
+    """Test Agent can be initialized."""
+    pass
+
+def test_chat_workflow():
+    """Test chat workflow."""
+    pass
+
+def test_bridge_send():
+    """Test bridge sends messages."""
+    pass
+```
+
+### Refactoring-Resistant Tests
+
+**Test behavior, not implementation details.** Tests should pass even when internal implementation changes, as long as the public behavior remains the same.
+
+```python
+# Good - tests behavior through public API
+def test_bridge_send_makes_message_available_via_get_messages():
+    """Test bridge send makes messages available via get_messages."""
+    bridge = Bridge()
+    message = ChatMessage(role="user", content="Hello")
+    
+    await bridge.send(message)
+    
+    # Verify through public API
+    received_message = await anext(bridge.get_messages())
+    assert received_message.content == "Hello"
+
+# Bad - tests implementation details (private members)
+def test_bridge_send():
+    """Test bridge sends messages."""
+    bridge = Bridge()
+    message = ChatMessage(role="user", content="Hello")
+    
+    await bridge.send(message)
+    
+    # Bad: accessing private member
+    received_message = await bridge._message_queue.get()
+    assert received_message.content == "Hello"
+```
+
+**Avoid testing internal structure:**
+
+```python
+# Good - tests actual execution result
+def test_create_project_analysis_workflow_executes_successfully():
+    """Test project analysis workflow executes and returns results."""
+    graph = create_project_analysis_workflow()
+    
+    result = await graph.run(
+        GetProjectTree(project_root=root),
+        state=ProjectState(),
+    )
+    
+    assert result.output is not None
+    assert "file_count" in result.output
+
+# Bad - tests implementation details
+def test_create_project_analysis_workflow():
+    """Test creating project analysis workflow."""
+    graph = create_project_analysis_workflow()
+    
+    # Bad: testing internal structure
+    assert len(graph.node_defs) == 2
+```
+
+### Avoid Meaningless London-Style Tests
+
+**Don't write tests that only verify method calls without checking meaningful behavior.**
+
+```python
+# Good - tests meaningful behavior
+def test_agent_chat_stream_yields_response_chunks():
+    """Test Agent chat_stream yields response chunks correctly."""
+    agent = Agent(model="test-model")
+    
+    # Mock and setup...
+    
+    chunks = []
+    async for chunk in agent.chat_stream(messages):
+        chunks.append(chunk)
+    
+    # Verify actual behavior
+    assert len(chunks) == 2
+    assert "".join(chunks) == "Hello World"
+
+# Bad - tests only that method was called
+def test_agent_chat_stream():
+    """Test Agent chat_stream method."""
+    agent = Agent(model="test-model")
+    
+    # Mock and setup...
+    
+    # Bad: only verifies method was called
+    agent.chat_stream.assert_called_once()
+```
+
+### Prevent Infinite Loops in Tests
+
+**When testing workflows or loops, ensure tests terminate properly.**
+
+```python
+# Good - prevents infinite loops
+@pytest.mark.asyncio
+async def test_create_chat_workflow_processes_messages():
+    """Test chat workflow processes messages correctly."""
+    graph = create_chat_workflow()
+    
+    call_count = 0
+    
+    async def mock_receive():
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            yield user_message
+        # Prevent infinite loop
+        raise asyncio.CancelledError()
+    
+    mock_adapter.receive = mock_receive
+    
+    # Use timeout to prevent infinite wait
+    try:
+        result = await asyncio.wait_for(
+            graph.run(ReceiveMessage(), state=state, deps=deps, adapter=mock_adapter),
+            timeout=1.0,
+        )
+    except (asyncio.TimeoutError, asyncio.CancelledError):
+        pass
+    
+    # Verify behavior
+    assert len(state.message_history) > 0
+
+# Bad - may hang indefinitely
+@pytest.mark.asyncio
+async def test_create_chat_workflow():
+    """Test chat workflow."""
+    graph = create_chat_workflow()
+    
+    async def mock_receive():
+        yield user_message  # Will be called repeatedly
+    
+    # Bad: no mechanism to stop infinite loop
+    result = await graph.run(ReceiveMessage(), ...)
+```
+
+### Given-When-Then Structure
+
+**Structure tests clearly with setup, execution, and verification phases.**
+
+```python
+def test_example():
+    """Test description."""
+    # Given - setup test data and mocks
+    state = TestState(value=10)
+    mock_service = MagicMock()
+    
+    # When - execute the code under test
+    result = function_under_test(state, mock_service)
+    
+    # Then - verify the results
+    assert result.output == expected_value
+    assert state.value == 11
+```
+
+### Test Organization Principles
+
+1. **One assertion per concept** - Group related assertions together
+2. **Test one thing** - Each test should verify a single behavior
+3. **Use descriptive names** - Test name should explain what is tested
+4. **Avoid test interdependencies** - Tests should be independent and runnable in any order
+5. **Use appropriate test doubles** - Mocks, stubs, fakes as needed, but prefer real objects when possible
+
+### Common Pitfalls to Avoid
+
+- ❌ Testing private members (`_private_method`, `_private_attribute`)
+- ❌ Testing implementation details (internal data structures, node counts, etc.)
+- ❌ Writing tests that only verify method calls without checking results
+- ❌ Creating tests that can hang indefinitely
+- ❌ Using vague test names that don't describe what is tested
+- ❌ Writing tests that depend on execution order
+- ❌ Over-mocking (mocking everything instead of real objects)
+
 ---
 
 ## Summary Checklist
@@ -230,6 +433,10 @@ Before committing any changes, ensure:
 - [ ] Applied ruff formatting with 80 column limit enforced
 - [ ] All relevant tests pass
 - [ ] Followed TDD workflow (tests written first)
+- [ ] Test names clearly describe what is being tested
+- [ ] Tests verify behavior, not implementation details
+- [ ] Tests use public APIs only (no private member access)
+- [ ] Tests cannot hang indefinitely (timeouts for async/loops)
 - [ ] Commit message uses conventional prefix (`feat:`, `fix:`, `refactor:`, etc.)
 - [ ] Commit message is clear and concise
 

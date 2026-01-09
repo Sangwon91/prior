@@ -93,8 +93,8 @@ class ConvergeNode(BaseNode[TestState, None, str]):
         return End("converged")
 
 
-def test_to_mermaid_simple():
-    """Test basic mermaid generation."""
+def test_graph_generates_mermaid_diagram_with_single_node():
+    """Test graph generates mermaid diagram containing single node."""
     graph = Graph(nodes=(SimpleNode,))
     mermaid = graph.to_mermaid()
 
@@ -104,8 +104,8 @@ def test_to_mermaid_simple():
     assert "SimpleNode --> End" in mermaid
 
 
-def test_to_mermaid_with_branching():
-    """Test mermaid generation with branching."""
+def test_graph_generates_mermaid_diagram_with_branching():
+    """Test graph generates mermaid diagram showing branching paths."""
     graph = Graph(nodes=(BranchNode, TrueBranchNode, FalseBranchNode))
     mermaid = graph.to_mermaid()
 
@@ -116,8 +116,8 @@ def test_to_mermaid_with_branching():
     assert "BranchNode -->" in mermaid
 
 
-def test_to_mermaid_with_convergence():
-    """Test mermaid generation with converging paths."""
+def test_graph_generates_mermaid_diagram_with_converging_paths():
+    """Test graph generates mermaid diagram showing converging paths."""
     graph = Graph(nodes=(DecisionNode, ConvergeA, ConvergeB, ConvergeNode))
     mermaid = graph.to_mermaid()
 
@@ -131,8 +131,8 @@ def test_to_mermaid_with_convergence():
     assert "ConvergeB --> ConvergeNode" in mermaid
 
 
-def test_to_mermaid_with_name():
-    """Test mermaid generation with graph name."""
+def test_graph_generates_mermaid_diagram_with_custom_name():
+    """Test graph generates mermaid diagram with custom graph name."""
     graph = Graph(nodes=(SimpleNode,), name="TestGraph")
     mermaid = graph.to_mermaid()
 
@@ -140,8 +140,8 @@ def test_to_mermaid_with_name():
     assert "subgraph TestGraph" in mermaid or "TestGraph" in mermaid
 
 
-def test_to_mermaid_ink_url():
-    """Test mermaid.ink URL generation."""
+def test_graph_generates_mermaid_ink_url():
+    """Test graph generates mermaid.ink URL for visualization."""
     graph = Graph(nodes=(SimpleNode,))
     url = graph.to_mermaid_ink_url()
 
@@ -158,8 +158,8 @@ def test_to_mermaid_ink_url():
     assert "theme=dark" in img_url
 
 
-def test_save_as_image(tmp_path):
-    """Test saving graph as image file (default is SVG)."""
+def test_graph_saves_as_image_file(tmp_path):
+    """Test graph saves mermaid diagram as image file (default SVG)."""
     graph = Graph(nodes=(SimpleNode,))
     output_file = tmp_path / "test_graph.svg"
 

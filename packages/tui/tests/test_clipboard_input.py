@@ -18,8 +18,8 @@ class ClipboardTestApp(App):
 
 
 @pytest.mark.asyncio
-async def test_clipboard_input_insert_text_at_cursor():
-    """Test _insert_text_at_cursor inserts text at cursor position."""
+async def test_clipboard_input_inserts_text_at_cursor_position():
+    """Test ClipboardInput inserts text at current cursor position."""
     app = ClipboardTestApp()
 
     async with app.run_test() as pilot:
@@ -41,8 +41,8 @@ async def test_clipboard_input_insert_text_at_cursor():
 
 
 @pytest.mark.asyncio
-async def test_clipboard_input_insert_text_at_start():
-    """Test _insert_text_at_cursor inserts text at start."""
+async def test_clipboard_input_inserts_text_at_start_when_cursor_at_start():
+    """Test ClipboardInput inserts text at start when cursor is at position 0."""
     app = ClipboardTestApp()
 
     async with app.run_test() as pilot:
@@ -63,8 +63,8 @@ async def test_clipboard_input_insert_text_at_start():
 
 
 @pytest.mark.asyncio
-async def test_clipboard_input_insert_text_at_end():
-    """Test _insert_text_at_cursor inserts text at end."""
+async def test_clipboard_input_inserts_text_at_end_when_cursor_at_end():
+    """Test ClipboardInput inserts text at end when cursor is at end."""
     app = ClipboardTestApp()
 
     async with app.run_test() as pilot:
@@ -85,8 +85,8 @@ async def test_clipboard_input_insert_text_at_end():
 
 
 @pytest.mark.asyncio
-async def test_clipboard_input_insert_text_removes_newlines():
-    """Test _insert_text_at_cursor removes newlines and carriage returns."""
+async def test_clipboard_input_removes_newlines_from_inserted_text():
+    """Test ClipboardInput removes newlines and carriage returns from pasted text."""
     app = ClipboardTestApp()
 
     async with app.run_test() as pilot:
@@ -115,8 +115,8 @@ async def test_clipboard_input_insert_text_removes_newlines():
 
 
 @pytest.mark.asyncio
-async def test_clipboard_input_on_paste():
-    """Test on_paste handles Paste event correctly."""
+async def test_clipboard_input_on_paste_inserts_text_and_stops_event():
+    """Test ClipboardInput on_paste inserts text and stops event propagation."""
     app = ClipboardTestApp()
 
     async with app.run_test() as pilot:
@@ -154,8 +154,8 @@ async def test_clipboard_input_on_paste():
 
 
 @pytest.mark.asyncio
-async def test_clipboard_input_on_paste_empty_text():
-    """Test on_paste handles empty Paste event."""
+async def test_clipboard_input_on_paste_handles_empty_text():
+    """Test ClipboardInput on_paste handles empty Paste event without changes."""
     app = ClipboardTestApp()
 
     async with app.run_test() as pilot:
@@ -191,8 +191,8 @@ async def test_clipboard_input_on_paste_empty_text():
 
 
 @pytest.mark.asyncio
-async def test_clipboard_input_on_paste_with_newlines():
-    """Test on_paste removes newlines from pasted text."""
+async def test_clipboard_input_on_paste_removes_newlines_from_pasted_text():
+    """Test ClipboardInput on_paste removes newlines from pasted text."""
     app = ClipboardTestApp()
 
     async with app.run_test() as pilot:
@@ -230,8 +230,8 @@ async def test_clipboard_input_on_paste_with_newlines():
 
 
 @pytest.mark.asyncio
-async def test_clipboard_input_action_paste():
-    """Test action_paste can be called without error."""
+async def test_clipboard_input_action_paste_does_nothing():
+    """Test ClipboardInput action_paste does nothing (waits for Paste event)."""
     app = ClipboardTestApp()
 
     async with app.run_test() as pilot:
@@ -253,8 +253,8 @@ async def test_clipboard_input_action_paste():
 
 
 @pytest.mark.asyncio
-async def test_clipboard_input_paste_integration():
-    """Test complete paste flow: action_paste -> Paste event -> on_paste."""
+async def test_clipboard_input_complete_paste_flow():
+    """Test ClipboardInput complete paste flow from action_paste to on_paste."""
     app = ClipboardTestApp()
 
     async with app.run_test() as pilot:
@@ -289,8 +289,8 @@ async def test_clipboard_input_paste_integration():
 
 
 @pytest.mark.asyncio
-async def test_clipboard_input_multiple_pastes():
-    """Test multiple paste operations."""
+async def test_clipboard_input_handles_multiple_paste_operations():
+    """Test ClipboardInput handles multiple consecutive paste operations."""
     app = ClipboardTestApp()
 
     async with app.run_test() as pilot:
