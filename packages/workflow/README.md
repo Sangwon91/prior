@@ -6,6 +6,10 @@ Graph-based workflow execution engine for complex agent tasks.
 
 This package provides a graph-based execution engine for orchestrating complex workflows with state management, conditional branching, and type-safe node execution. The workflow engine uses a node-based architecture where each node can return the next node to execute or an `End` node to terminate execution.
 
+## Implementation Notes
+
+This implementation was inspired by pydantic's graph implementation, but the dependency system was reimplemented from scratch to avoid external dependencies. Whether this will continue to evolve in the same direction as pydantic's graph in the future is uncertain. This choice was made simply to suit our own preferences and needs.
+
 ## Features
 
 - **Graph-based execution**: Define workflows as graphs with node classes
