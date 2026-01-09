@@ -7,6 +7,9 @@ from pathlib import Path
 
 from tools.filetree import get_project_tree
 from workflow import BaseNode, End, Graph, GraphRunContext
+from workflow.types import NodeState
+
+from .event_publisher import AgentEventPublisher
 
 
 @dataclass
@@ -78,19 +81,45 @@ def create_project_analysis_workflow() -> Graph[ProjectState, None, dict]:
 
 async def execute_project_analysis(
     project_root: Path | None = None,
+    event_publisher: AgentEventPublisher | None = None,
 ) -> dict:
     """
     Execute project analysis workflow.
 
     Args:
         project_root: Project root directory
+        event_publisher: Optional event publisher for workflow events
 
     Returns:
         Analysis results dictionary
     """
     graph = create_project_analysis_workflow()
     state = ProjectState()
-    result = await graph.run(
-        GetProjectTree(project_root=project_root), state=state
+    workflow_id = (
+        event_publisher.generate_workflow_id()
+        if event_publisher
+        else "workflow-unknown"
     )
-    return result.output
+
+    try:
+        if event_publisher:
+            await event_publisher.publish_workflow_started(workflow_id)
+
+        result = await graph.run(
+            GetProjectTree(project_root=project_root), state=state
+        )
+
+        if event_publisher:
+            await event_publisher.publish_workflow_completed(
+                workflow_id, result.output
+            )
+
+        return result.output
+    except Exception as e:
+        if event_publisher:
+            await event_publisher.publish_workflow_error(
+                workflow_id,
+                str(e),
+                {"type": type(e).__name__},
+            )
+        raise

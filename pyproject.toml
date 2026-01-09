@@ -9,6 +9,7 @@ authors = [
 requires-python = ">=3.12"
 dependencies = [
     "agent",
+    "adapter",
     "python-dotenv>=1.0.0",
     "tui",
 ]
@@ -35,6 +36,8 @@ testpaths = [
     "packages/tui/tests",
     "packages/tools/tests",
     "packages/workflow/tests",
+    "packages/protocol/tests",
+    "packages/adapter/tests",
 ]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
@@ -47,6 +50,8 @@ pythonpath = [
     "packages/tui/src",
     "packages/tools/src",
     "packages/workflow/src",
+    "packages/protocol/src",
+    "packages/adapter/src",
 ]
 # Async test support
 asyncio_mode = "auto"
@@ -63,6 +68,8 @@ members = [
     "packages/agent",
     "packages/tools",
     "packages/workflow",
+    "packages/protocol",
+    "packages/adapter",
 ]
 
 [tool.uv.sources]
@@ -70,6 +77,8 @@ tui = { workspace = true }
 agent = { workspace = true }
 tools = { workspace = true }
 workflow = { workspace = true }
+protocol = { workspace = true }
+adapter = { workspace = true }
 
 [tool.ruff]
 line-length = 80
