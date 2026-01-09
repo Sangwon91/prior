@@ -79,10 +79,10 @@ cd packages/workflow
 uv run pytest tests -v
 ```
 
-### Option 2: Use `--from` Flag
+### Option 2: Use `--package` Flag
 
 ```bash
-uv run --from packages/workflow pytest packages/workflow/tests -v
+uv run --package workflow pytest packages/workflow/tests -v
 ```
 
 Both approaches are valid. Choose based on context and convenience.
