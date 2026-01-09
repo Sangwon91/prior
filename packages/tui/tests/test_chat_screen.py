@@ -30,7 +30,7 @@ class MockAdapter:
         while True:
             try:
                 message = await asyncio.wait_for(
-                    self._receive_queue.get(), timeout=0.1
+                    self._receive_queue.get(), timeout=1.0
                 )
                 yield message
             except asyncio.TimeoutError:
@@ -190,3 +190,117 @@ async def test_chat_screen_quit_action_exits_app():
             # Quit action should exit app
             screen.action_quit()
             # App should be exiting (exact behavior depends on Textual)
+
+
+@pytest.mark.asyncio
+async def test_chat_screen_accumulates_streaming_chunks():
+    """Test ChatScreen accumulates streaming chunks correctly."""
+    from tui.app import PriorApp
+
+    mock_adapter = MockAdapter()
+    chat_service = ChatService(adapter=mock_adapter)
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        app = PriorApp(chat_service=chat_service, project_root=Path(tmpdir))
+
+        async with app.run_test() as pilot:
+            screen = app.screen
+
+            # Send streaming chunks
+            message_id = "test-msg-123"
+            chunk1 = ChatMessage(
+                role="assistant",
+                content="Hello",
+                event_type="chunk",
+                message_id=message_id,
+            )
+            chunk2 = ChatMessage(
+                role="assistant",
+                content=" World",
+                event_type="chunk",
+                message_id=message_id,
+            )
+
+            await mock_adapter.put_message(chunk1)
+            # Wait for message to be processed
+            await asyncio.sleep(0.2)
+            await pilot.pause()
+
+            # Verify first chunk was processed
+            assert message_id in screen._assistant_streams
+            assert screen._assistant_streams[message_id]["content"] == "Hello"
+
+            await mock_adapter.put_message(chunk2)
+            # Wait for message to be processed
+            await asyncio.sleep(0.2)
+            await pilot.pause()
+
+            # Check that chunks are accumulated in stream tracking
+            assert message_id in screen._assistant_streams
+            assert screen._assistant_streams[message_id]["content"] == (
+                "Hello World"
+            )
+
+
+@pytest.mark.asyncio
+async def test_chat_screen_finalizes_message_on_complete_event():
+    """Test ChatScreen finalizes message when complete event is received."""
+    from tui.app import PriorApp
+
+    mock_adapter = MockAdapter()
+    chat_service = ChatService(adapter=mock_adapter)
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        app = PriorApp(chat_service=chat_service, project_root=Path(tmpdir))
+
+        async with app.run_test() as pilot:
+            screen = app.screen
+
+            # Send streaming chunks
+            message_id = "test-msg-456"
+            chunk1 = ChatMessage(
+                role="assistant",
+                content="Hello",
+                event_type="chunk",
+                message_id=message_id,
+            )
+            chunk2 = ChatMessage(
+                role="assistant",
+                content=" World",
+                event_type="chunk",
+                message_id=message_id,
+            )
+            complete = ChatMessage(
+                role="assistant",
+                content="Hello World",
+                event_type="message",
+                message_id=message_id,
+            )
+
+            await mock_adapter.put_message(chunk1)
+            await asyncio.sleep(0.2)
+            await pilot.pause()
+
+            await mock_adapter.put_message(chunk2)
+            await asyncio.sleep(0.2)
+            await pilot.pause()
+
+            # Verify chunks are accumulated before complete message
+            assert message_id in screen._assistant_streams
+            assert screen._assistant_streams[message_id]["content"] == (
+                "Hello World"
+            )
+
+            await mock_adapter.put_message(complete)
+            await asyncio.sleep(0.2)
+            await pilot.pause()
+
+            # Check that message was finalized and added to history
+            assert message_id not in screen._assistant_streams
+            assistant_messages = [
+                msg
+                for msg in screen.message_history
+                if msg["role"] == "assistant"
+            ]
+            assert len(assistant_messages) > 0
+            assert assistant_messages[-1]["content"] == "Hello World"

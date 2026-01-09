@@ -59,3 +59,46 @@ def test_chat_message_deserializes_from_json_string():
     assert message.role == "assistant"
     assert message.content == "Hello world"
     assert message.timestamp == 1234567890.0
+
+
+def test_chat_message_has_default_event_type_message():
+    """Test ChatMessage has default event_type of 'message'."""
+    message = ChatMessage(role="user", content="Hello")
+    assert message.event_type == "message"
+
+
+def test_chat_message_supports_chunk_event_type():
+    """Test ChatMessage supports 'chunk' event_type for streaming."""
+    message = ChatMessage(role="assistant", content="Hello", event_type="chunk")
+    assert message.event_type == "chunk"
+
+
+def test_chat_message_supports_message_id():
+    """Test ChatMessage supports optional message_id for grouping chunks."""
+    message = ChatMessage(
+        role="assistant",
+        content="Hello",
+        event_type="chunk",
+        message_id="msg-123",
+    )
+    assert message.message_id == "msg-123"
+
+
+def test_chat_message_message_id_defaults_to_none():
+    """Test ChatMessage message_id defaults to None."""
+    message = ChatMessage(role="user", content="Hello")
+    assert message.message_id is None
+
+
+def test_chat_message_with_event_type_serializes_correctly():
+    """Test ChatMessage with event_type serializes correctly."""
+    message = ChatMessage(
+        role="assistant",
+        content="Test",
+        event_type="chunk",
+        message_id="msg-123",
+    )
+    json_str = message.model_dump_json()
+    parsed = ChatMessage.model_validate_json(json_str)
+    assert parsed.event_type == "chunk"
+    assert parsed.message_id == "msg-123"

@@ -1,5 +1,6 @@
 """Simple LLM agent wrapper using LiteLLM."""
 
+import uuid
 from collections.abc import AsyncIterator
 from typing import TYPE_CHECKING, Any
 
@@ -60,6 +61,9 @@ class Agent:
 
         all_messages = system_messages + messages
 
+        # Generate unique message ID for this response
+        message_id = str(uuid.uuid4())
+
         # Call LiteLLM with streaming
         response = await acompletion(
             model=self.model,
@@ -68,14 +72,29 @@ class Agent:
         )
 
         # Stream response chunks
+        response_content = ""
         async for chunk in response:
             if chunk.choices and len(chunk.choices) > 0:
                 delta = chunk.choices[0].delta
                 if delta and delta.content:
-                    # Send via adapter if available
+                    response_content += delta.content
+                    # Send chunk via adapter if available
                     if self.adapter:
                         chat_message = ChatMessage(
-                            role="assistant", content=delta.content
+                            role="assistant",
+                            content=delta.content,
+                            event_type="chunk",
+                            message_id=message_id,
                         )
                         await self.adapter.send(chat_message)
                     yield delta.content
+
+        # Send complete message after streaming is done
+        if self.adapter and response_content:
+            complete_message = ChatMessage(
+                role="assistant",
+                content=response_content,
+                event_type="message",
+                message_id=message_id,
+            )
+            await self.adapter.send(complete_message)

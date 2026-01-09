@@ -14,3 +14,16 @@ class ChatMessage(BaseModel):
     timestamp: float | None = Field(
         default_factory=lambda: datetime.now().timestamp()
     )
+    event_type: Literal["chunk", "message"] = Field(
+        default="message",
+        description=(
+            "Type of event: 'chunk' for streaming chunks, "
+            "'message' for complete messages"
+        ),
+    )
+    message_id: str | None = Field(
+        default=None,
+        description=(
+            "Optional message ID to group chunks from the same response"
+        ),
+    )
