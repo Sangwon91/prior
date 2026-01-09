@@ -3,14 +3,13 @@
 import asyncio
 from pathlib import Path
 
-from protocol.models import ChatMessage  # noqa: F401
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.screen import Screen
-from textual.widgets import Footer, Header, Input, Markdown, Static
+from textual.widgets import Footer, Header, Input, Static
 
 from ..chat_service import ChatService
-from ..widgets import ClipboardInput, MousePassthroughScroll
+from ..widgets import ClipboardInput, MessageDisplay, MousePassthroughScroll
 
 
 class ChatScreen(Screen):
@@ -84,12 +83,8 @@ class ChatScreen(Screen):
         super().__init__()
         self.chat_service = chat_service
         self.project_root = project_root or chat_service.project_root
-        self.message_history: list[dict[str, str]] = []
         self._receive_task: asyncio.Task | None = None
-        self._current_assistant_widget: Markdown | None = None
-        self._current_assistant_content: str = ""
-        # Track assistant messages by message_id for streaming
-        self._assistant_streams: dict[str, dict[str, str | Markdown]] = {}
+        self._message_display: MessageDisplay | None = None
 
     def compose(self) -> ComposeResult:
         """Create child widgets."""
@@ -112,6 +107,12 @@ class ChatScreen(Screen):
 
     def on_mount(self) -> None:
         """Called when screen is mounted."""
+        # Initialize message display
+        messages_container = self.query_one(
+            "#messages-container", MousePassthroughScroll
+        )
+        self._message_display = MessageDisplay(messages_container)
+
         # Focus input box
         self.query_one("#input-box", ClipboardInput).focus()
 
@@ -142,128 +143,25 @@ class ChatScreen(Screen):
         input_box = self.query_one("#input-box", ClipboardInput)
         input_box.value = ""
 
-        # Send message via adapter
+        # Send message via adapter (history managed by ChatService)
         await self.chat_service.send_message(user_input)
 
-        # Add to history
-        self.message_history.append({"role": "user", "content": user_input})
-
         # Display user message
-        self._add_user_message(user_input)
-        # Reset assistant widget for new conversation turn
-        self._current_assistant_widget = None
-        self._current_assistant_content = ""
-        self._assistant_streams.clear()
+        if self._message_display:
+            self._message_display.add_user_message(user_input)
 
     async def _receive_messages(self) -> None:
         """Receive messages from adapter and display them."""
         try:
             async for message in self.chat_service.receive_messages():
-                # Type: message is ChatMessage
-                if message.role == "assistant":
-                    # Handle streaming chunks vs complete messages
-                    if message.event_type == "chunk":
-                        # Streaming chunk: accumulate content
-                        message_id = message.message_id or "default"
-                        if message_id not in self._assistant_streams:
-                            self._assistant_streams[message_id] = {
-                                "content": "",
-                                "widget": None,
-                            }
-                        stream = self._assistant_streams[message_id]
-                        stream["content"] += message.content
-                        updated_widget = self._update_assistant_stream(
-                            message_id, stream["content"], stream["widget"]
-                        )
-                        if stream["widget"] is None:
-                            stream["widget"] = updated_widget
-                    elif message.event_type == "message":
-                        # Complete message: finalize and add to history
-                        message_id = message.message_id or "default"
-                        # If this message_id was being streamed, use accumulated
-                        # content, otherwise use message content
-                        if message_id in self._assistant_streams:
-                            final_content = (
-                                self._assistant_streams[message_id]["content"]
-                            )
-                            # Update widget one last time with final content
-                            widget = self._assistant_streams[message_id]["widget"]
-                            if widget:
-                                widget.update(final_content)
-                            # Clean up stream tracking
-                            del self._assistant_streams[message_id]
-                        else:
-                            final_content = message.content
-                            self._add_assistant_message(final_content)
-                        # Add to history
-                        self.message_history.append(
-                            {"role": "assistant", "content": final_content}
-                        )
-                    else:
-                        # Fallback for messages without event_type (backward
-                        # compatibility)
-                        self._add_assistant_message(message.content)
-                        self.message_history.append(
-                            {"role": "assistant", "content": message.content}
-                        )
+                # ChatService handles streaming and only yields complete
+                # messages
+                if message.role == "assistant" and self._message_display:
+                    self._message_display.add_assistant_message(
+                        message.content
+                    )
         except asyncio.CancelledError:
             pass
-
-    def _add_user_message(self, content: str) -> None:
-        """Add user message to display."""
-        messages_container = self.query_one(
-            "#messages-container", MousePassthroughScroll
-        )
-        user_markdown = Markdown(
-            f"**You:** {content}", classes="user-message"
-        )
-        messages_container.mount(user_markdown)
-        # Scroll to bottom to show new message
-        messages_container.scroll_end(animate=False)
-
-    def _add_assistant_message(self, content: str) -> None:
-        """Add assistant message to display."""
-        messages_container = self.query_one(
-            "#messages-container", MousePassthroughScroll
-        )
-        # Accumulate content
-        self._current_assistant_content += content
-        if self._current_assistant_widget is None:
-            assistant_markdown = Markdown(
-                self._current_assistant_content, classes="assistant-message"
-            )
-            messages_container.mount(assistant_markdown)
-            self._current_assistant_widget = assistant_markdown
-        else:
-            # Update existing widget with accumulated content
-            self._current_assistant_widget.update(self._current_assistant_content)
-        messages_container.scroll_end(animate=False)
-
-    def _update_assistant_stream(
-        self, message_id: str, content: str, widget: Markdown | None
-    ) -> Markdown:
-        """Update assistant message stream display.
-
-        Returns:
-            The widget that was created or updated
-        """
-        messages_container = self.query_one(
-            "#messages-container", MousePassthroughScroll
-        )
-        if widget is None:
-            # Create new widget for this stream
-            assistant_markdown = Markdown(
-                content, classes="assistant-message"
-            )
-            messages_container.mount(assistant_markdown)
-            self._current_assistant_widget = assistant_markdown
-            messages_container.scroll_end(animate=False)
-            return assistant_markdown
-        else:
-            # Update existing widget
-            widget.update(content)
-            messages_container.scroll_end(animate=False)
-            return widget
 
     def action_quit(self) -> None:
         """Quit the application."""

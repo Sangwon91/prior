@@ -42,6 +42,4 @@ class PriorApp(App):
 
     def on_mount(self) -> None:
         """Called when app is mounted."""
-        self.push_screen(
-            ChatScreen(self.chat_service, self.project_root)
-        )
+        self.push_screen(ChatScreen(self.chat_service, self.project_root))

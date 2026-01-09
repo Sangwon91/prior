@@ -64,7 +64,7 @@ async def test_chat_screen_initializes_with_chat_service_and_project_root():
 
         assert screen.chat_service == chat_service
         assert screen.project_root == Path(tmpdir)
-        assert len(screen.message_history) == 0
+        assert len(chat_service.message_history) == 0
 
 
 @pytest.mark.asyncio
@@ -117,10 +117,10 @@ async def test_chat_screen_adds_message_to_history_and_sends_via_adapter():
             await asyncio.sleep(0.1)
             await pilot.pause()
 
-            # Check that message was added to history
-            assert len(screen.message_history) >= 1
-            assert screen.message_history[0]["role"] == "user"
-            assert screen.message_history[0]["content"] == "Test message"
+            # Check that message was added to history (managed by ChatService)
+            assert len(chat_service.message_history) >= 1
+            assert chat_service.message_history[0]["role"] == "user"
+            assert chat_service.message_history[0]["content"] == "Test message"
 
             # Check that message was sent via adapter
             assert len(mock_adapter.sent_messages) == 1
@@ -146,14 +146,16 @@ async def test_chat_screen_allows_multiple_inputs_while_processing():
             # Submit first message
             from textual.widgets import Input
 
-            initial_history_len = len(screen.message_history)
+            initial_history_len = len(chat_service.message_history)
             event1 = Input.Submitted(input_box, "First question")
             await screen.on_input_submitted(event1)
 
             # Check that first message was added
-            assert len(screen.message_history) == initial_history_len + 1
-            assert screen.message_history[-1]["role"] == "user"
-            assert screen.message_history[-1]["content"] == "First question"
+            assert len(chat_service.message_history) == initial_history_len + 1
+            assert chat_service.message_history[-1]["role"] == "user"
+            assert (
+                chat_service.message_history[-1]["content"] == "First question"
+            )
 
             # Wait a bit
             await asyncio.sleep(0.1)
@@ -165,10 +167,12 @@ async def test_chat_screen_allows_multiple_inputs_while_processing():
             await screen.on_input_submitted(event2)
 
             # History should have increased (both messages added)
-            assert len(screen.message_history) >= initial_history_len + 2
+            assert len(chat_service.message_history) >= initial_history_len + 2
             # Find the second user message
             user_messages = [
-                msg for msg in screen.message_history if msg["role"] == "user"
+                msg
+                for msg in chat_service.message_history
+                if msg["role"] == "user"
             ]
             assert len(user_messages) >= 2
             assert user_messages[-1]["content"] == "Second question"
@@ -194,7 +198,7 @@ async def test_chat_screen_quit_action_exits_app():
 
 @pytest.mark.asyncio
 async def test_chat_screen_accumulates_streaming_chunks():
-    """Test ChatScreen accumulates streaming chunks correctly."""
+    """Test ChatService accumulates streaming chunks correctly."""
     from tui.app import PriorApp
 
     mock_adapter = MockAdapter()
@@ -226,9 +230,9 @@ async def test_chat_screen_accumulates_streaming_chunks():
             await asyncio.sleep(0.2)
             await pilot.pause()
 
-            # Verify first chunk was processed
-            assert message_id in screen._assistant_streams
-            assert screen._assistant_streams[message_id]["content"] == "Hello"
+            # Verify first chunk was processed (in ChatService)
+            assert message_id in chat_service._assistant_streams
+            assert chat_service._assistant_streams[message_id] == "Hello"
 
             await mock_adapter.put_message(chunk2)
             # Wait for message to be processed
@@ -236,15 +240,15 @@ async def test_chat_screen_accumulates_streaming_chunks():
             await pilot.pause()
 
             # Check that chunks are accumulated in stream tracking
-            assert message_id in screen._assistant_streams
-            assert screen._assistant_streams[message_id]["content"] == (
+            assert message_id in chat_service._assistant_streams
+            assert chat_service._assistant_streams[message_id] == (
                 "Hello World"
             )
 
 
 @pytest.mark.asyncio
 async def test_chat_screen_finalizes_message_on_complete_event():
-    """Test ChatScreen finalizes message when complete event is received."""
+    """Test ChatService finalizes message when complete event is received."""
     from tui.app import PriorApp
 
     mock_adapter = MockAdapter()
@@ -286,8 +290,8 @@ async def test_chat_screen_finalizes_message_on_complete_event():
             await pilot.pause()
 
             # Verify chunks are accumulated before complete message
-            assert message_id in screen._assistant_streams
-            assert screen._assistant_streams[message_id]["content"] == (
+            assert message_id in chat_service._assistant_streams
+            assert chat_service._assistant_streams[message_id] == (
                 "Hello World"
             )
 
@@ -296,10 +300,10 @@ async def test_chat_screen_finalizes_message_on_complete_event():
             await pilot.pause()
 
             # Check that message was finalized and added to history
-            assert message_id not in screen._assistant_streams
+            assert message_id not in chat_service._assistant_streams
             assistant_messages = [
                 msg
-                for msg in screen.message_history
+                for msg in chat_service.message_history
                 if msg["role"] == "assistant"
             ]
             assert len(assistant_messages) > 0
