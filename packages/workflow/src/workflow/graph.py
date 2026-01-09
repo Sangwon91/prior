@@ -6,7 +6,7 @@ from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Generic, Literal, TypeVar
+from typing import TYPE_CHECKING, Generic, Literal, TypeVar
 
 from .mermaid import (
     graph_to_mermaid,
@@ -15,6 +15,9 @@ from .mermaid import (
 )
 from .node import BaseNode, End
 from .state import DepsT, GraphRunContext, StateT
+
+if TYPE_CHECKING:
+    from adapter import AdapterClient
 
 RunEndT = TypeVar("RunEndT")
 
@@ -36,10 +39,12 @@ class GraphRun(Generic[StateT, DepsT, RunEndT]):
         start_node: BaseNode[StateT, DepsT, RunEndT],
         state: StateT,
         deps: DepsT | None = None,
+        adapter: "AdapterClient | None" = None,
     ):
         self.graph = graph
         self.state = state
         self.deps = deps
+        self.adapter = adapter
         self._next_node: BaseNode[StateT, DepsT, RunEndT] | End[RunEndT] = (
             start_node
         )
@@ -98,7 +103,9 @@ class GraphRun(Generic[StateT, DepsT, RunEndT]):
             raise ValueError(f"Node `{node}` is not in the graph.")
 
         # Execute node
-        ctx = GraphRunContext(state=self.state, deps=self.deps)
+        ctx = GraphRunContext(
+            state=self.state, deps=self.deps, adapter=self.adapter
+        )
         self._next_node = await node.run(ctx)
 
         # Update state from context
@@ -155,6 +162,7 @@ class Graph(Generic[StateT, DepsT, RunEndT]):
         *,
         state: StateT,
         deps: DepsT | None = None,
+        adapter: "AdapterClient | None" = None,
     ) -> AsyncIterator[GraphRun[StateT, DepsT, RunEndT]]:
         """
         Iterate through graph execution.
@@ -163,11 +171,12 @@ class Graph(Generic[StateT, DepsT, RunEndT]):
             start_node: The first node to run
             state: The initial state of the graph
             deps: The dependencies of the graph
+            adapter: Optional adapter client for communication
 
         Yields:
             GraphRun context manager for iterating through nodes
         """
-        run = GraphRun(self, start_node, state, deps)
+        run = GraphRun(self, start_node, state, deps, adapter)
         async with run:
             yield run
 
@@ -177,6 +186,7 @@ class Graph(Generic[StateT, DepsT, RunEndT]):
         *,
         state: StateT,
         deps: DepsT | None = None,
+        adapter: "AdapterClient | None" = None,
     ) -> GraphRunResult[StateT, RunEndT]:
         """
         Run the graph from a starting node until it ends.
@@ -185,11 +195,14 @@ class Graph(Generic[StateT, DepsT, RunEndT]):
             start_node: The first node to run
             state: The initial state of the graph
             deps: The dependencies of the graph
+            adapter: Optional adapter client for communication
 
         Returns:
             A GraphRunResult containing the final result and state
         """
-        async with self.iter(start_node, state=state, deps=deps) as graph_run:
+        async with self.iter(
+            start_node, state=state, deps=deps, adapter=adapter
+        ) as graph_run:
             async for _node in graph_run:
                 pass
 
@@ -204,6 +217,7 @@ class Graph(Generic[StateT, DepsT, RunEndT]):
         *,
         state: StateT,
         deps: DepsT | None = None,
+        adapter: "AdapterClient | None" = None,
     ) -> GraphRunResult[StateT, RunEndT]:
         """
         Synchronously run the graph.
@@ -212,6 +226,7 @@ class Graph(Generic[StateT, DepsT, RunEndT]):
             start_node: The first node to run
             state: The initial state of the graph
             deps: The dependencies of the graph
+            adapter: Optional adapter client for communication
 
         Returns:
             The result of running the graph
@@ -241,7 +256,7 @@ class Graph(Generic[StateT, DepsT, RunEndT]):
                 asyncio.set_event_loop(loop)
 
         return loop.run_until_complete(
-            self.run(start_node, state=state, deps=deps)
+            self.run(start_node, state=state, deps=deps, adapter=adapter)
         )
 
     def to_mermaid(self) -> str:

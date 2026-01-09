@@ -1,14 +1,13 @@
 """FastAPI WebSocket server for adapter."""
 
 import asyncio
-from typing import Any
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
 from .bridge import Bridge
 from .connection_manager import ConnectionManager
-from protocol.models import ControlCommand, WorkflowEvent
+from protocol.models import ChatMessage
 
 
 def create_app(bridge: Bridge | None = None) -> FastAPI:
@@ -41,32 +40,32 @@ def create_app(bridge: Bridge | None = None) -> FastAPI:
         """
         WebSocket endpoint for Agent connections.
 
-        Agent publishes events and receives commands.
+        Agent sends and receives chat messages.
 
         Args:
             websocket: WebSocket connection
         """
         await manager.connect(websocket)
         try:
-            # Handle both events and commands from Agent
-            async for message in manager.receive_messages(websocket):
-                try:
-                    # Try to parse as event first
+            # Agent sends messages
+            async def receive_from_agent():
+                async for message in manager.receive_messages(websocket):
                     try:
-                        event = WorkflowEvent.model_validate_json(message)
-                        await bridge.publish_event(event)
-                        continue
-                    except Exception:
-                        pass
-
-                    # Try to parse as command
-                    try:
-                        command = ControlCommand.model_validate_json(message)
-                        await bridge.handle_command(command)
+                        chat_message = ChatMessage.model_validate_json(message)
+                        await bridge.send(chat_message)
                     except Exception:
                         pass  # Ignore invalid messages
-                except Exception:
-                    pass  # Ignore invalid messages
+
+            # Agent receives messages
+            async def send_to_agent():
+                async for message in bridge.create_subscriber():
+                    json_data = message.model_dump_json()
+                    await manager.send_personal_message(json_data, websocket)
+
+            await asyncio.gather(
+                receive_from_agent(),
+                send_to_agent(),
+            )
         except WebSocketDisconnect:
             manager.disconnect(websocket)
 
@@ -75,31 +74,31 @@ def create_app(bridge: Bridge | None = None) -> FastAPI:
         """
         WebSocket endpoint for TUI connections.
 
-        TUI receives events and sends commands.
+        TUI sends and receives chat messages.
 
         Args:
             websocket: WebSocket connection
         """
         await manager.connect(websocket)
         try:
-            # TUI receives events from Agent
-            async def send_events():
-                async for event in bridge.create_event_subscriber():
-                    json_data = event.model_dump_json()
+            # TUI receives messages from Agent
+            async def send_to_tui():
+                async for message in bridge.create_subscriber():
+                    json_data = message.model_dump_json()
                     await manager.send_personal_message(json_data, websocket)
 
-            # TUI sends commands to Agent
-            async def receive_commands():
+            # TUI sends messages to Agent
+            async def receive_from_tui():
                 async for message in manager.receive_messages(websocket):
                     try:
-                        command = ControlCommand.model_validate_json(message)
-                        await bridge.handle_command(command)
+                        chat_message = ChatMessage.model_validate_json(message)
+                        await bridge.send(chat_message)
                     except Exception:
                         pass  # Ignore invalid messages
 
             await asyncio.gather(
-                send_events(),
-                receive_commands(),
+                send_to_tui(),
+                receive_from_tui(),
             )
         except WebSocketDisconnect:
             manager.disconnect(websocket)

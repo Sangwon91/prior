@@ -4,44 +4,55 @@ import asyncio
 import tempfile
 from collections.abc import AsyncIterator
 from pathlib import Path
-from typing import Any
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from protocol.models import ChatMessage
 from tui.chat_service import ChatService
 from tui.screens.chat import ChatScreen
 
 
-class MockAgent:
-    """Mock agent implementing AgentProtocol for testing."""
+class MockAdapter:
+    """Mock adapter for testing."""
 
     def __init__(self):
-        self.chat_calls = []
+        self.sent_messages = []
+        self.received_messages = []
+        self._receive_queue = asyncio.Queue()
 
-    async def chat_stream(
-        self, messages: list[dict[str, Any]], project_context: str = ""
-    ) -> AsyncIterator[str]:
-        """Mock streaming response."""
-        self.chat_calls.append((messages, project_context))
-        # Yield some test chunks
-        for chunk in ["Hello", " ", "World"]:
-            yield chunk
+    async def send(self, message):
+        """Mock send."""
+        self.sent_messages.append(message)
+
+    async def receive(self):
+        """Mock receive."""
+        while True:
+            try:
+                message = await asyncio.wait_for(
+                    self._receive_queue.get(), timeout=0.1
+                )
+                yield message
+            except asyncio.TimeoutError:
+                break
+
+    async def put_message(self, message):
+        """Helper to put a message in the receive queue."""
+        await self._receive_queue.put(message)
 
 
 class MockChatService(ChatService):
     """Mock chat service for testing."""
 
     def __init__(self, project_root: Path | None = None):
-        agent = MockAgent()
-        super().__init__(agent, project_root)
-        self.stream_calls = []
+        mock_adapter = MockAdapter()
+        super().__init__(adapter=mock_adapter, project_root=project_root)
+        self.send_calls = []
 
-    async def stream_response(self, messages):
-        """Mock streaming response."""
-        self.stream_calls.append(messages)
-        # Yield some test chunks
-        for chunk in ["Hello", " ", "World"]:
-            yield chunk
+    async def send_message(self, content: str):
+        """Mock send message."""
+        self.send_calls.append(content)
+        await super().send_message(content)
 
 
 @pytest.mark.asyncio
@@ -54,8 +65,6 @@ async def test_chat_screen_initialization():
         assert screen.chat_service == chat_service
         assert screen.project_root == Path(tmpdir)
         assert len(screen.message_history) == 0
-        # Check that no streaming tasks are active
-        assert len(screen._active_streaming_tasks) == 0
 
 
 @pytest.mark.asyncio
@@ -63,10 +72,11 @@ async def test_chat_screen_compose():
     """Test ChatScreen compose method."""
     from tui.app import PriorApp
 
-    agent = MockAgent()
+    mock_adapter = MockAdapter()
+    chat_service = ChatService(adapter=mock_adapter)
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        app = PriorApp(agent, project_root=Path(tmpdir))
+        app = PriorApp(chat_service=chat_service, project_root=Path(tmpdir))
 
         async with app.run_test():
             screen = app.screen
@@ -79,19 +89,17 @@ async def test_chat_screen_compose():
             )
             assert messages_container is not None
 
-            # streaming-message widget is created dynamically during streaming
-            # so it won't exist initially
-
 
 @pytest.mark.asyncio
 async def test_chat_screen_input_submission():
     """Test ChatScreen handles input submission."""
     from tui.app import PriorApp
 
-    agent = MockAgent()
+    mock_adapter = MockAdapter()
+    chat_service = ChatService(adapter=mock_adapter)
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        app = PriorApp(agent, project_root=Path(tmpdir))
+        app = PriorApp(chat_service=chat_service, project_root=Path(tmpdir))
 
         async with app.run_test() as pilot:
             screen = app.screen
@@ -105,29 +113,19 @@ async def test_chat_screen_input_submission():
 
             await screen.on_input_submitted(event)
 
-            # Wait for streaming to complete (with timeout)
-            import asyncio
-
-            for _ in range(20):  # Try up to 20 times
-                await asyncio.sleep(0.1)
-                await pilot.pause()
-                # Check if streaming tasks are done
-                if len(screen._active_streaming_tasks) == 0:
-                    break
+            # Wait a bit for processing
+            await asyncio.sleep(0.1)
+            await pilot.pause()
 
             # Check that message was added to history
-            assert len(screen.message_history) >= 1  # at least user message
+            assert len(screen.message_history) >= 1
             assert screen.message_history[0]["role"] == "user"
             assert screen.message_history[0]["content"] == "Test message"
 
-            # Check that agent was called (streaming should have started)
-            # Note: streaming is async, so it might not complete immediately
-            # But the user message should be in history
-            assert screen.message_history[0]["content"] == "Test message"
-
-            # If streaming completed, assistant message should be there
-            if len(screen.message_history) >= 2:
-                assert screen.message_history[1]["role"] == "assistant"
+            # Check that message was sent via adapter
+            assert len(mock_adapter.sent_messages) == 1
+            assert mock_adapter.sent_messages[0].role == "user"
+            assert mock_adapter.sent_messages[0].content == "Test message"
 
 
 @pytest.mark.asyncio
@@ -135,10 +133,11 @@ async def test_chat_screen_allows_multiple_inputs_during_streaming():
     """Test that input is allowed during streaming (multiple questions)."""
     from tui.app import PriorApp
 
-    agent = MockAgent()
+    mock_adapter = MockAdapter()
+    chat_service = ChatService(adapter=mock_adapter)
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        app = PriorApp(agent, project_root=Path(tmpdir))
+        app = PriorApp(chat_service=chat_service, project_root=Path(tmpdir))
 
         async with app.run_test() as pilot:
             screen = app.screen
@@ -156,11 +155,11 @@ async def test_chat_screen_allows_multiple_inputs_during_streaming():
             assert screen.message_history[-1]["role"] == "user"
             assert screen.message_history[-1]["content"] == "First question"
 
-            # Wait a bit and check if streaming started (may complete quickly with mock)
+            # Wait a bit
             await asyncio.sleep(0.1)
             await pilot.pause()
 
-            # Submit second message (should be allowed regardless of streaming state)
+            # Submit second message (should be allowed)
             input_box.value = "Second question"
             event2 = Input.Submitted(input_box, "Second question")
             await screen.on_input_submitted(event2)
@@ -180,10 +179,11 @@ async def test_chat_screen_quit_action():
     """Test quit action."""
     from tui.app import PriorApp
 
-    agent = MockAgent()
+    mock_adapter = MockAdapter()
+    chat_service = ChatService(adapter=mock_adapter)
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        app = PriorApp(agent, project_root=Path(tmpdir))
+        app = PriorApp(chat_service=chat_service, project_root=Path(tmpdir))
 
         async with app.run_test():
             screen = app.screen

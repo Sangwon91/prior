@@ -2,99 +2,60 @@
 
 import pytest
 
-from protocol.models import (
-    ControlCommand,
-    NodeProgress,
-    WorkflowCompleted,
-    WorkflowError,
-    WorkflowEvent,
-    WorkflowStarted,
-)
+from protocol.models import ChatMessage
 
 
-def test_workflow_started():
-    """Test WorkflowStarted model."""
-    event = WorkflowStarted(workflow_id="test-123")
-    assert event.workflow_id == "test-123"
-    assert event.timestamp > 0
+def test_chat_message_user():
+    """Test ChatMessage with user role."""
+    message = ChatMessage(role="user", content="Hello")
+    assert message.role == "user"
+    assert message.content == "Hello"
+    assert message.timestamp is not None
 
 
-def test_node_progress():
-    """Test NodeProgress model."""
-    progress = NodeProgress(
-        workflow_id="test-123",
-        node_id="node-1",
-        state="running",
-        progress=0.5,
-    )
-    assert progress.workflow_id == "test-123"
-    assert progress.node_id == "node-1"
-    assert progress.state == "running"
-    assert progress.progress == 0.5
+def test_chat_message_assistant():
+    """Test ChatMessage with assistant role."""
+    message = ChatMessage(role="assistant", content="Hi there")
+    assert message.role == "assistant"
+    assert message.content == "Hi there"
 
 
-def test_workflow_event_with_started():
-    """Test WorkflowEvent with WorkflowStarted."""
-    started = WorkflowStarted(workflow_id="test-123")
-    event = WorkflowEvent(
-        workflow_id="test-123",
-        event_type="started",
-        data=started,
-    )
-    assert event.workflow_id == "test-123"
-    assert event.event_type == "started"
-    assert isinstance(event.data, WorkflowStarted)
+def test_chat_message_system():
+    """Test ChatMessage with system role."""
+    message = ChatMessage(role="system", content="System message")
+    assert message.role == "system"
+    assert message.content == "System message"
 
 
-def test_workflow_event_with_progress():
-    """Test WorkflowEvent with NodeProgress."""
-    progress = NodeProgress(
-        workflow_id="test-123",
-        node_id="node-1",
-        state="running",
-    )
-    event = WorkflowEvent(
-        workflow_id="test-123",
-        event_type="progress",
-        data=progress,
-    )
-    assert event.event_type == "progress"
-    assert isinstance(event.data, NodeProgress)
-
-
-def test_control_command():
-    """Test ControlCommand model."""
-    command = ControlCommand(
-        workflow_id="test-123",
-        command="cancel",
-    )
-    assert command.workflow_id == "test-123"
-    assert command.command == "cancel"
-    assert command.timestamp > 0
+def test_chat_message_timestamp():
+    """Test ChatMessage timestamp generation."""
+    message1 = ChatMessage(role="user", content="First")
+    message2 = ChatMessage(role="user", content="Second")
+    # Timestamps should be different (or very close)
+    assert message1.timestamp is not None
+    assert message2.timestamp is not None
 
 
 def test_json_serialization():
-    """Test JSON serialization of models."""
-    event = WorkflowEvent(
-        workflow_id="test-123",
-        event_type="started",
-        data=WorkflowStarted(workflow_id="test-123"),
-    )
-    json_str = event.model_dump_json()
+    """Test JSON serialization of ChatMessage."""
+    message = ChatMessage(role="user", content="Test message")
+    json_str = message.model_dump_json()
     assert isinstance(json_str, str)
-    assert "test-123" in json_str
+    assert "Test message" in json_str
+    assert "user" in json_str
 
     # Test deserialization
-    parsed = WorkflowEvent.model_validate_json(json_str)
-    assert parsed.workflow_id == event.workflow_id
-    assert parsed.event_type == event.event_type
+    parsed = ChatMessage.model_validate_json(json_str)
+    assert parsed.role == message.role
+    assert parsed.content == message.content
 
 
 def test_json_deserialization():
-    """Test JSON deserialization of models."""
+    """Test JSON deserialization of ChatMessage."""
     json_str = (
-        '{"workflow_id":"test-123","command":"cancel","timestamp":1234567890.0}'
+        '{"role":"assistant","content":"Hello world","timestamp":1234567890.0}'
     )
-    command = ControlCommand.model_validate_json(json_str)
-    assert command.workflow_id == "test-123"
-    assert command.command == "cancel"
+    message = ChatMessage.model_validate_json(json_str)
+    assert message.role == "assistant"
+    assert message.content == "Hello world"
+    assert message.timestamp == 1234567890.0

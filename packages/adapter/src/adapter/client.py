@@ -1,139 +1,98 @@
-"""WebSocket client implementations for Agent and TUI."""
+"""Adapter client for sending and receiving chat messages."""
 
 import asyncio
 import json
 from collections.abc import AsyncIterator
-from typing import Any
 
 import websockets
 from websockets.client import WebSocketClientProtocol
 
-from protocol.interfaces import EventPublisher, EventSubscriber
-from protocol.models import ControlCommand, WorkflowEvent
+from protocol.models import ChatMessage
 
 
-class WebSocketEventPublisher:
-    """WebSocket-based event publisher for Agent."""
+class AdapterClient:
+    """Simple adapter client for sending and receiving messages."""
 
     def __init__(self, uri: str):
         """
-        Initialize WebSocket event publisher.
+        Initialize adapter client.
 
         Args:
-            uri: WebSocket server URI (e.g., ws://localhost:8000/ws/agent)
+            uri: WebSocket server URI
         """
         self.uri = uri
         self._websocket: WebSocketClientProtocol | None = None
         self._connected = False
+        self._receive_queue: asyncio.Queue[ChatMessage] = asyncio.Queue()
+        self._receive_task: asyncio.Task | None = None
 
     async def connect(self) -> None:
         """Connect to WebSocket server."""
         if not self._connected:
             self._websocket = await websockets.connect(self.uri)
             self._connected = True
+            # Start receiving messages in background
+            self._receive_task = asyncio.create_task(self._receive_loop())
 
     async def disconnect(self) -> None:
         """Disconnect from WebSocket server."""
+        if self._receive_task:
+            self._receive_task.cancel()
+            try:
+                await self._receive_task
+            except asyncio.CancelledError:
+                pass
+            self._receive_task = None
+
         if self._websocket:
             await self._websocket.close()
             self._connected = False
             self._websocket = None
 
-    async def publish_workflow_event(self, event: WorkflowEvent) -> None:
-        """
-        Publish a workflow event.
+    async def _receive_loop(self) -> None:
+        """Background task to receive messages."""
+        if not self._websocket:
+            return
 
-        Args:
-            event: Workflow event to publish
-        """
-        if not self._connected:
-            await self.connect()
-
-        if self._websocket:
-            json_data = event.model_dump_json()
-            await self._websocket.send(json_data)
-
-    async def receive_commands(
-        self,
-    ) -> AsyncIterator[ControlCommand]:
-        """
-        Receive control commands.
-
-        Yields:
-            Control commands as they arrive
-        """
-        if not self._connected:
-            await self.connect()
-
-        if self._websocket:
+        try:
             async for message in self._websocket:
                 try:
-                    # Check if message is a command or event
-                    data = json.loads(message)
-                    if "command" in data:
-                        command = ControlCommand.model_validate_json(message)
-                        yield command
+                    chat_message = ChatMessage.model_validate_json(message)
+                    await self._receive_queue.put(chat_message)
                 except Exception:
                     pass  # Ignore invalid messages
+        except Exception:
+            pass  # Connection closed
 
-
-class WebSocketEventSubscriber:
-    """WebSocket-based event subscriber for TUI."""
-
-    def __init__(self, uri: str):
+    async def send(self, message: ChatMessage) -> None:
         """
-        Initialize WebSocket event subscriber.
+        Send a chat message.
 
         Args:
-            uri: WebSocket server URI (e.g., ws://localhost:8000/ws/tui)
+            message: Chat message to send
         """
-        self.uri = uri
-        self._websocket: WebSocketClientProtocol | None = None
-        self._connected = False
-
-    async def connect(self) -> None:
-        """Connect to WebSocket server."""
         if not self._connected:
-            self._websocket = await websockets.connect(self.uri)
-            self._connected = True
+            await self.connect()
 
-    async def disconnect(self) -> None:
-        """Disconnect from WebSocket server."""
         if self._websocket:
-            await self._websocket.close()
-            self._connected = False
-            self._websocket = None
+            json_data = message.model_dump_json()
+            await self._websocket.send(json_data)
 
-    async def subscribe_workflow_events(
-        self,
-    ) -> AsyncIterator[WorkflowEvent]:
+    async def receive(self) -> AsyncIterator[ChatMessage]:
         """
-        Subscribe to workflow events.
+        Receive chat messages.
 
         Yields:
-            Workflow events as they arrive
+            Chat messages as they arrive
         """
         if not self._connected:
             await self.connect()
 
-        if self._websocket:
-            async for message in self._websocket:
-                try:
-                    event = WorkflowEvent.model_validate_json(message)
-                    yield event
-                except Exception:
-                    pass  # Ignore invalid messages
-
-    async def send_command(self, command: ControlCommand) -> None:
-        """
-        Send a control command.
-
-        Args:
-            command: Control command to send
-        """
-        if not self._connected:
-            await self.connect()
-
-        if self._websocket:
-            json_data = command.model_dump_json()
-            await self._websocket.send(json_data)
+        while True:
+            try:
+                message = await self._receive_queue.get()
+                yield message
+            except asyncio.CancelledError:
+                break
+            except Exception:
+                break

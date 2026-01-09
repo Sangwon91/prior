@@ -1,7 +1,10 @@
 """State management for workflow execution."""
 
 from dataclasses import dataclass
-from typing import Generic, TypeVar
+from typing import TYPE_CHECKING, Generic, TypeVar
+
+if TYPE_CHECKING:
+    from adapter import AdapterClient
 
 StateT = TypeVar("StateT")
 DepsT = TypeVar("DepsT")
@@ -13,3 +16,4 @@ class GraphRunContext(Generic[StateT, DepsT]):
 
     state: StateT
     deps: DepsT | None = None
+    adapter: "AdapterClient | None" = None

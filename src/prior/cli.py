@@ -3,19 +3,14 @@
 import asyncio
 import os
 import socket
-from contextlib import asynccontextmanager
 
 import uvicorn
 from dotenv import load_dotenv
 
-from adapter import Bridge, create_app
-from adapter.client import (
-    WebSocketEventPublisher,
-    WebSocketEventSubscriber,
-)
-from agent import Agent, AgentEventPublisher
+from adapter import Bridge, AdapterClient, create_app
+from agent import Agent
 from tui.app import PriorApp
-from tui.event_subscriber import TuiEventSubscriber
+from tui.chat_service import ChatService
 
 
 def find_available_port(
@@ -99,43 +94,39 @@ def main() -> None:
     adapter_host = os.getenv("PRIOR_ADAPTER_HOST", "localhost")
     adapter_port = int(os.getenv("PRIOR_ADAPTER_PORT", "8000"))
 
-    # Initialize agent
-    agent = Agent(model=model)
-
-    # Setup adapter and WebSocket connections
+    # Setup adapter and connections
     async def setup_connections():
         # Start adapter server (finds available port if needed)
         bridge, actual_port = await start_adapter_server(
             adapter_host, adapter_port
         )
 
-        # Create WebSocket clients with actual port
+        # Create adapter clients with actual port
         agent_ws_uri = f"ws://{adapter_host}:{actual_port}/ws/agent"
         tui_ws_uri = f"ws://{adapter_host}:{actual_port}/ws/tui"
 
-        # Setup Agent event publisher
-        agent_publisher = WebSocketEventPublisher(agent_ws_uri)
-        await agent_publisher.connect()
+        # Create adapter clients
+        agent_adapter = AdapterClient(agent_ws_uri)
+        await agent_adapter.connect()
 
-        event_publisher = AgentEventPublisher(agent_publisher)
+        tui_adapter = AdapterClient(tui_ws_uri)
+        await tui_adapter.connect()
 
-        # Setup TUI event subscriber
-        tui_subscriber = WebSocketEventSubscriber(tui_ws_uri)
-        await tui_subscriber.connect()
+        # Initialize agent with adapter
+        agent = Agent(model=model, adapter=agent_adapter)
 
-        event_subscriber = TuiEventSubscriber(tui_subscriber)
-
-        return agent, event_publisher, event_subscriber
+        return agent, tui_adapter
 
     # Run setup in async context
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-    agent, event_publisher, event_subscriber = loop.run_until_complete(
-        setup_connections()
-    )
+    agent, tui_adapter = loop.run_until_complete(setup_connections())
+
+    # Create chat service with adapter (no agent dependency)
+    chat_service = ChatService(adapter=tui_adapter)
 
     # Create and run app
-    app = PriorApp(agent)
+    app = PriorApp(chat_service=chat_service)
     app.run()
 
 

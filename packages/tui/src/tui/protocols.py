@@ -3,15 +3,8 @@
 from collections.abc import AsyncIterator
 from typing import Any, Protocol
 
-# Re-export protocol interfaces for backward compatibility
-from protocol.interfaces import (
-    ControlCommandHandler,
-    EventPublisher,
-    EventSubscriber,
-)
-from protocol.models import ControlCommand, WorkflowEvent
 
-
+# AgentProtocol for agent implementations
 class AgentProtocol(Protocol):
     """Protocol for agent implementations."""
 
@@ -35,10 +28,4 @@ class AgentProtocol(Protocol):
 
 __all__ = [
     "AgentProtocol",
-    "ControlCommand",
-    "ControlCommandHandler",
-    "EventPublisher",
-    "EventSubscriber",
-    "WorkflowEvent",
 ]
-

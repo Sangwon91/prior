@@ -1,22 +1,33 @@
 """Simple LLM agent wrapper using LiteLLM."""
 
 from collections.abc import AsyncIterator
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from litellm import acompletion
+
+from protocol.models import ChatMessage
+
+if TYPE_CHECKING:
+    from adapter import AdapterClient
 
 
 class Agent:
     """Thin wrapper around LiteLLM for streaming chat."""
 
-    def __init__(self, model: str = "claude-sonnet-4-5"):
+    def __init__(
+        self,
+        model: str = "claude-sonnet-4-5",
+        adapter: "AdapterClient | None" = None,
+    ):
         """
         Initialize agent.
 
         Args:
             model: Model name to use (default: claude-sonnet-4-5)
+            adapter: Optional adapter client for sending messages
         """
         self.model = model
+        self.adapter = adapter
 
     async def chat_stream(
         self, messages: list[dict[str, Any]], project_context: str = ""
@@ -37,7 +48,13 @@ class Agent:
             system_messages.append(
                 {
                     "role": "system",
-                    "content": f"You are a coding assistant. Here is the project structure:\n\n{project_context}\n\nYou can answer questions about the project structure and help with coding tasks.",
+                    "content": (
+                        f"You are a coding assistant. "
+                        f"Here is the project structure:\n\n"
+                        f"{project_context}\n\n"
+                        f"You can answer questions about the project "
+                        f"structure and help with coding tasks."
+                    ),
                 }
             )
 
@@ -55,4 +72,10 @@ class Agent:
             if chunk.choices and len(chunk.choices) > 0:
                 delta = chunk.choices[0].delta
                 if delta and delta.content:
+                    # Send via adapter if available
+                    if self.adapter:
+                        chat_message = ChatMessage(
+                            role="assistant", content=delta.content
+                        )
+                        await self.adapter.send(chat_message)
                     yield delta.content

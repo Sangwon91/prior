@@ -2,48 +2,52 @@
 
 from collections.abc import AsyncIterator
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING
 
-from tools.filetree import get_project_tree
+from protocol.models import ChatMessage
 
-from .protocols import AgentProtocol
+if TYPE_CHECKING:
+    from adapter import AdapterClient
 
 
 class ChatService:
-    """Service layer for chat operations, decoupling UI from Agent and filetree."""
+    """Service layer for chat operations, decoupling UI from adapter."""
 
-    def __init__(self, agent: AgentProtocol, project_root: Path | None = None):
+    def __init__(
+        self,
+        adapter: "AdapterClient | None" = None,
+        project_root: Path | None = None,
+    ):
         """
         Initialize chat service.
 
         Args:
-            agent: Agent instance for LLM interactions
+            adapter: Adapter client for sending/receiving messages
             project_root: Project root directory (default: current directory)
         """
-        self.agent = agent
+        self.adapter = adapter
         self.project_root = project_root or Path.cwd()
-        self._project_tree: str | None = None
 
-    @property
-    def project_tree(self) -> str:
-        """Get project tree, caching it for performance."""
-        if self._project_tree is None:
-            self._project_tree = get_project_tree(self.project_root)
-        return self._project_tree
-
-    async def stream_response(
-        self, messages: list[dict[str, Any]]
-    ) -> AsyncIterator[str]:
+    async def send_message(self, content: str) -> None:
         """
-        Stream response from agent with project context.
+        Send a user message via adapter.
 
         Args:
-            messages: List of message dicts with 'role' and 'content' keys
+            content: Message content to send
+        """
+        if self.adapter:
+            message = ChatMessage(role="user", content=content)
+            await self.adapter.send(message)
+
+    async def receive_messages(
+        self,
+    ) -> AsyncIterator[ChatMessage]:
+        """
+        Receive messages from adapter.
 
         Yields:
-            Chunks of response text as they arrive
+            Chat messages as they arrive
         """
-        async for chunk in self.agent.chat_stream(
-            messages, project_context=self.project_tree
-        ):
-            yield chunk
+        if self.adapter:
+            async for message in self.adapter.receive():
+                yield message

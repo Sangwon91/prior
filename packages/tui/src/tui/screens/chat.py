@@ -3,6 +3,7 @@
 import asyncio
 from pathlib import Path
 
+from protocol.models import ChatMessage
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.screen import Screen
@@ -84,21 +85,23 @@ class ChatScreen(Screen):
         self.chat_service = chat_service
         self.project_root = project_root or chat_service.project_root
         self.message_history: list[dict[str, str]] = []
-        self._active_streaming_tasks: set[asyncio.Task] = (
-            set()
-        )  # Track active streaming tasks
+        self._receive_task: asyncio.Task | None = None
 
     def compose(self) -> ComposeResult:
         """Create child widgets."""
         yield Header()
         with Vertical(id="chat-container"):
-            yield Static(f"Project: {self.project_root.name}", id="status-bar")
+            yield Static(
+                f"Project: {self.project_root.name}", id="status-bar"
+            )
             yield Static("", id="current-question")
             with MousePassthroughScroll(id="messages-container"):
                 pass  # Messages will be added dynamically
             with Horizontal(id="input-container"):
                 yield ClipboardInput(
-                    placeholder="Ask about the project or request coding help...",
+                    placeholder=(
+                        "Ask about the project or request coding help..."
+                    ),
                     id="input-box",
                 )
         yield Footer()
@@ -108,6 +111,17 @@ class ChatScreen(Screen):
         # Focus input box
         self.query_one("#input-box", ClipboardInput).focus()
 
+        # Start receiving messages from adapter
+        if self.chat_service.adapter:
+            self._receive_task = asyncio.create_task(
+                self._receive_messages()
+            )
+
+    def on_unmount(self) -> None:
+        """Called when screen is unmounted."""
+        if self._receive_task:
+            self._receive_task.cancel()
+
     async def on_input_submitted(self, event: Input.Submitted) -> None:
         """Handle input submission."""
         user_input = event.value.strip()
@@ -115,12 +129,17 @@ class ChatScreen(Screen):
             return
 
         # Update current question display
-        current_question_widget = self.query_one("#current-question", Static)
+        current_question_widget = self.query_one(
+            "#current-question", Static
+        )
         current_question_widget.update(f"Current Question: {user_input}")
 
         # Clear input (but don't disable - allow multiple questions)
         input_box = self.query_one("#input-box", ClipboardInput)
         input_box.value = ""
+
+        # Send message via adapter
+        await self.chat_service.send_message(user_input)
 
         # Add to history
         self.message_history.append({"role": "user", "content": user_input})
@@ -128,80 +147,41 @@ class ChatScreen(Screen):
         # Display user message
         self._add_user_message(user_input)
 
-        # Start streaming response as background task
-        # This allows multiple questions to be asked simultaneously
-        task = asyncio.create_task(self._stream_response())
-        self._active_streaming_tasks.add(task)
-        task.add_done_callback(self._active_streaming_tasks.discard)
+    async def _receive_messages(self) -> None:
+        """Receive messages from adapter and display them."""
+        try:
+            async for message in self.chat_service.receive_messages():
+                if message.role == "assistant":
+                    self._add_assistant_message(message.content)
+                    # Add to history
+                    self.message_history.append(
+                        {"role": "assistant", "content": message.content}
+                    )
+        except asyncio.CancelledError:
+            pass
 
     def _add_user_message(self, content: str) -> None:
         """Add user message to display."""
         messages_container = self.query_one(
             "#messages-container", MousePassthroughScroll
         )
-        user_markdown = Markdown(f"**You:** {content}", classes="user-message")
+        user_markdown = Markdown(
+            f"**You:** {content}", classes="user-message"
+        )
         messages_container.mount(user_markdown)
         # Scroll to bottom to show new message
         messages_container.scroll_end(animate=False)
 
-    async def _stream_response(self) -> None:
-        """Stream response from chat service."""
-        current_response = ""
-        try:
-            # Get streaming response
-            response_chunks: list[str] = []
-            messages_container = self.query_one(
-                "#messages-container", MousePassthroughScroll
-            )
-
-            # Create streaming widget
-            streaming_widget = Markdown("", classes="assistant-message")
-            messages_container.mount(streaming_widget)
-            messages_container.scroll_end(animate=False)
-
-            async for chunk in self.chat_service.stream_response(
-                self.message_history
-            ):
-                response_chunks.append(chunk)
-                current_response += chunk
-
-                # Update streaming markdown widget with current response
-                streaming_widget.update(current_response)
-                # Scroll to bottom to follow streaming
-                messages_container.scroll_end(animate=False)
-                # Refresh to show updates
-                await self._refresh_messages()
-
-            # Add complete response to history
-            full_response = "".join(response_chunks)
-            self.message_history.append(
-                {"role": "assistant", "content": full_response}
-            )
-
-            # Replace streaming widget with completed message
-            completed_markdown = Markdown(
-                full_response, classes="assistant-message"
-            )
-            streaming_widget.remove()
-            messages_container.mount(completed_markdown)
-
-            # Scroll to bottom
-            messages_container.scroll_end(animate=False)
-
-        except Exception as e:
-            messages_container = self.query_one(
-                "#messages-container", MousePassthroughScroll
-            )
-            error_markdown = Markdown(
-                f"**Error:** {str(e)}", classes="assistant-message"
-            )
-            messages_container.mount(error_markdown)
-            messages_container.scroll_end(animate=False)
-
-    async def _refresh_messages(self) -> None:
-        """Refresh messages display."""
-        # Yield control to allow UI updates
-        await asyncio.sleep(0)
+    def _add_assistant_message(self, content: str) -> None:
+        """Add assistant message to display."""
+        messages_container = self.query_one(
+            "#messages-container", MousePassthroughScroll
+        )
+        assistant_markdown = Markdown(
+            content, classes="assistant-message"
+        )
+        messages_container.mount(assistant_markdown)
+        messages_container.scroll_end(animate=False)
 
     def action_quit(self) -> None:
         """Quit the application."""
