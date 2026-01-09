@@ -3,12 +3,15 @@
 import asyncio
 import os
 import socket
+import threading
 
 import uvicorn
 from dotenv import load_dotenv
 
 from adapter import Bridge, AdapterClient, create_app
 from agent import Agent
+from agent.workflows import execute_chat_loop
+from pathlib import Path
 from tui.app import PriorApp
 from tui.chat_service import ChatService
 
@@ -115,17 +118,56 @@ def main() -> None:
         # Initialize agent with adapter
         agent = Agent(model=model, adapter=agent_adapter)
 
-        return agent, tui_adapter
+        return agent, tui_adapter, agent_adapter
 
     # Run setup in async context
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-    agent, tui_adapter = loop.run_until_complete(setup_connections())
+    agent, tui_adapter, agent_adapter = loop.run_until_complete(
+        setup_connections()
+    )
+
+    # Get project root
+    project_root = Path.cwd()
+
+    # Start chat workflow loop as background task in main event loop
+    # This avoids event loop conflicts
+    async def start_chat_workflow():
+        """Start chat workflow in background."""
+        await execute_chat_loop(
+            agent=agent,
+            adapter=agent_adapter,
+            project_root=project_root,
+        )
+
+    # Create background task
+    chat_task = loop.create_task(start_chat_workflow())
+
+    # Keep event loop running in background thread
+    def run_event_loop():
+        """Run event loop in background thread."""
+        try:
+            loop.run_forever()
+        except Exception as e:
+            pass
+        finally:
+            # Cancel all tasks
+            pending = asyncio.all_tasks(loop)
+            for task in pending:
+                task.cancel()
+            loop.run_until_complete(
+                asyncio.gather(*pending, return_exceptions=True)
+            )
+            loop.close()
+
+    event_loop_thread = threading.Thread(target=run_event_loop, daemon=True)
+    event_loop_thread.start()
 
     # Create chat service with adapter (no agent dependency)
     chat_service = ChatService(adapter=tui_adapter)
 
     # Create and run app
+    # Note: The chat workflow loop is running in a background thread
     app = PriorApp(chat_service=chat_service)
     app.run()
 

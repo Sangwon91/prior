@@ -86,6 +86,8 @@ class ChatScreen(Screen):
         self.project_root = project_root or chat_service.project_root
         self.message_history: list[dict[str, str]] = []
         self._receive_task: asyncio.Task | None = None
+        self._current_assistant_widget: Markdown | None = None
+        self._current_assistant_content: str = ""
 
     def compose(self) -> ComposeResult:
         """Create child widgets."""
@@ -146,6 +148,9 @@ class ChatScreen(Screen):
 
         # Display user message
         self._add_user_message(user_input)
+        # Reset assistant widget for new conversation turn
+        self._current_assistant_widget = None
+        self._current_assistant_content = ""
 
     async def _receive_messages(self) -> None:
         """Receive messages from adapter and display them."""
@@ -177,10 +182,17 @@ class ChatScreen(Screen):
         messages_container = self.query_one(
             "#messages-container", MousePassthroughScroll
         )
-        assistant_markdown = Markdown(
-            content, classes="assistant-message"
-        )
-        messages_container.mount(assistant_markdown)
+        # Accumulate content
+        self._current_assistant_content += content
+        if self._current_assistant_widget is None:
+            assistant_markdown = Markdown(
+                self._current_assistant_content, classes="assistant-message"
+            )
+            messages_container.mount(assistant_markdown)
+            self._current_assistant_widget = assistant_markdown
+        else:
+            # Update existing widget with accumulated content
+            self._current_assistant_widget.update(self._current_assistant_content)
         messages_container.scroll_end(animate=False)
 
     def action_quit(self) -> None:

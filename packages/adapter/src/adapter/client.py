@@ -29,10 +29,18 @@ class AdapterClient:
     async def connect(self) -> None:
         """Connect to WebSocket server."""
         if not self._connected:
-            self._websocket = await websockets.connect(self.uri)
-            self._connected = True
-            # Start receiving messages in background
-            self._receive_task = asyncio.create_task(self._receive_loop())
+            try:
+                # Use longer timeout for connection
+                self._websocket = await asyncio.wait_for(
+                    websockets.connect(self.uri), timeout=10.0
+                )
+                self._connected = True
+                # Start receiving messages in background
+                self._receive_task = asyncio.create_task(self._receive_loop())
+            except asyncio.TimeoutError as e:
+                raise
+            except Exception as e:
+                raise
 
     async def disconnect(self) -> None:
         """Disconnect from WebSocket server."""
@@ -61,7 +69,7 @@ class AdapterClient:
                     await self._receive_queue.put(chat_message)
                 except Exception:
                     pass  # Ignore invalid messages
-        except Exception:
+        except Exception as e:
             pass  # Connection closed
 
     async def send(self, message: ChatMessage) -> None:
