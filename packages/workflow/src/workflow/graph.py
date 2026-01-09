@@ -205,9 +205,25 @@ class Graph(Generic[StateT, DepsT, RunEndT]):
         import asyncio
 
         try:
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
+            # If we're already in an event loop, we can't use run_until_complete
+            # Instead, we need to use a different approach
+            # For now, raise an error suggesting to use async run() instead
+            raise RuntimeError(
+                "Cannot use run_sync() within an async context. "
+                "Use await graph.run() instead."
+            )
         except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
+            # No running loop, create a new one
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    raise RuntimeError(
+                        "Cannot use run_sync() within an async context. "
+                        "Use await graph.run() instead."
+                    )
+            except RuntimeError:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
 
         return loop.run_until_complete(self.run(start_node, state=state, deps=deps))
