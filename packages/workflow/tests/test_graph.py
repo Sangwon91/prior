@@ -104,3 +104,5 @@ async def test_graph_node_not_in_graph():
     async with graph.iter(OtherNode(), state=state) as run:
         with pytest.raises(ValueError, match="not in the graph"):
             await run.next(OtherNode())
+
+

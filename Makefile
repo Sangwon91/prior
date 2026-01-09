@@ -1,14 +1,15 @@
-.PHONY: test test-all test-agent test-tui test-tools test-workflow test-prior help
+.PHONY: test test-all test-agent test-tui test-tools test-workflow test-workflow-visual test-prior help
 
 help:
 	@echo "Available test commands:"
-	@echo "  make test          - Run all tests (same as test-all)"
-	@echo "  make test-all      - Run all tests across all packages"
-	@echo "  make test-agent    - Run only agent package tests"
-	@echo "  make test-tui      - Run only tui package tests"
-	@echo "  make test-tools    - Run only tools package tests"
-	@echo "  make test-workflow - Run only workflow package tests"
-	@echo "  make test-prior    - Run only prior main package tests"
+	@echo "  make test                - Run all tests (same as test-all)"
+	@echo "  make test-all            - Run all tests across all packages"
+	@echo "  make test-agent          - Run only agent package tests"
+	@echo "  make test-tui            - Run only tui package tests"
+	@echo "  make test-tools          - Run only tools package tests"
+	@echo "  make test-workflow       - Run only workflow package tests (CI mode)"
+	@echo "  make test-workflow-visual - Run workflow tests with image output saved"
+	@echo "  make test-prior          - Run only prior main package tests"
 
 test: test-all
 
@@ -50,6 +51,11 @@ test-tools:
 test-workflow:
 	@echo "Running workflow package tests..."
 	@PYTHONPATH=packages/workflow/src uv run pytest packages/workflow/tests -v
+
+test-workflow-visual:
+	@echo "Running workflow package tests with visual output..."
+	@echo "This will save generated mermaid images to test_output/images/"
+	@PYTHONPATH=packages/workflow/src uv run pytest packages/workflow/tests -v --save-images --image-output-dir=test_output/images
 
 test-prior:
 	@echo "Running prior main package tests..."

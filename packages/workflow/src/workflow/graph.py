@@ -5,8 +5,14 @@ from __future__ import annotations
 from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
-from typing import Generic, TypeVar
+from pathlib import Path
+from typing import Generic, Literal, TypeVar
 
+from .mermaid import (
+    graph_to_mermaid,
+    mermaid_to_ink_url,
+    save_mermaid_as_image,
+)
 from .node import BaseNode, End
 from .state import DepsT, GraphRunContext, StateT
 
@@ -227,3 +233,88 @@ class Graph(Generic[StateT, DepsT, RunEndT]):
                 asyncio.set_event_loop(loop)
 
         return loop.run_until_complete(self.run(start_node, state=state, deps=deps))
+
+    def to_mermaid(self) -> str:
+        """
+        Generate a mermaid graph representation of this workflow graph.
+
+        Returns:
+            A mermaid graph string that can be rendered in markdown or mermaid viewers.
+        """
+        return graph_to_mermaid(self)
+
+    def to_mermaid_ink_url(
+        self,
+        format: Literal["img", "svg", "pdf"] = "img",
+        theme: str | None = None,
+        bg_color: str | None = None,
+        width: int | None = None,
+        height: int | None = None,
+    ) -> str:
+        """
+        Generate a mermaid.ink URL for this graph.
+        
+        Args:
+            format: Output format - "img" (default), "svg", or "pdf"
+            theme: Optional theme name (default, neutral, dark, forest)
+            bg_color: Optional background color (hex code or named color with ! prefix)
+            width: Optional image width in pixels
+            height: Optional image height in pixels
+            
+        Returns:
+            URL string for mermaid.ink image
+            
+        Examples:
+            >>> graph = Graph(nodes=(MyNode,))
+            >>> url = graph.to_mermaid_ink_url()
+            >>> url = graph.to_mermaid_ink_url(format="svg", theme="dark")
+            >>> url = graph.to_mermaid_ink_url(bg_color="!white", width=800)
+        """
+        mermaid_code = self.to_mermaid()
+        return mermaid_to_ink_url(
+            mermaid_code,
+            format=format,
+            theme=theme,
+            bg_color=bg_color,
+            width=width,
+            height=height,
+        )
+
+    def save_as_image(
+        self,
+        filepath: str | Path,
+        format: Literal["png", "jpeg", "webp", "svg", "pdf"] = "svg",
+        theme: str | None = None,
+        bg_color: str | None = None,
+        width: int | None = None,
+        height: int | None = None,
+    ) -> None:
+        """
+        Save the graph as an image file using mermaid.ink.
+        
+        Args:
+            filepath: Path where to save the image file
+            format: Image format - "png", "jpeg", "webp", "svg", or "pdf" (default: "svg")
+            theme: Optional theme name (default, neutral, dark, forest)
+            bg_color: Optional background color (hex code or named color with ! prefix)
+            width: Optional image width in pixels
+            height: Optional image height in pixels
+            
+        Raises:
+            IOError: If the image cannot be downloaded or saved
+            
+        Examples:
+            >>> graph = Graph(nodes=(MyNode,))
+            >>> graph.save_as_image("graph.svg")
+            >>> graph.save_as_image("graph.png", format="png")
+        """
+        mermaid_code = self.to_mermaid()
+        save_mermaid_as_image(
+            mermaid_code,
+            filepath,
+            format=format,
+            theme=theme,
+            bg_color=bg_color,
+            width=width,
+            height=height,
+        )

@@ -212,3 +212,58 @@ class TypedNode(BaseNode[MyState, dict, int]):
 
 - `output: RunEndT | None` - Final output from End node
 - `state: StateT` - Final state after execution
+
+## Mermaid Visualization
+
+The workflow package includes built-in support for visualizing graphs as mermaid diagrams.
+
+### Basic Usage
+
+```python
+from workflow import Graph
+
+graph = Graph(nodes=(MyNode, OtherNode))
+
+# Generate mermaid code
+mermaid_code = graph.to_mermaid()
+print(mermaid_code)
+
+# Generate mermaid.ink URL
+url = graph.to_mermaid_ink_url()
+print(url)  # Can be opened in browser or embedded in markdown
+
+# Save as image file
+graph.save_as_image("graph.png")
+graph.save_as_image("graph.svg", format="svg", theme="dark")
+```
+
+### Testing with Image Generation
+
+When writing tests, you can generate images for visual inspection:
+
+```python
+def test_my_graph(image_output_dir, should_save_images):
+    """Test that generates images for manual inspection."""
+    graph = Graph(nodes=(MyNode,))
+    
+    # Save image (will be kept if --save-images flag is used)
+    graph.save_as_image(image_output_dir / "my_graph.png")
+    
+    if should_save_images:
+        print(f"Image saved to: {image_output_dir / 'my_graph.png'}")
+```
+
+Run tests with image generation:
+
+```bash
+# Save images to default directory (test_output/images)
+pytest tests/test_graph.py::test_generate_visualization_images --save-images
+
+# Save to custom directory
+pytest tests/test_graph.py::test_generate_visualization_images --save-images --image-output-dir=my_images
+
+# Or use environment variable
+SAVE_TEST_IMAGES=1 pytest tests/test_graph.py::test_generate_visualization_images
+```
+
+Without the `--save-images` flag, images are saved to temporary directories that are automatically cleaned up after tests.
